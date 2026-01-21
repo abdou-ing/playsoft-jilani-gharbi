@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guacamole-web
+  labels:
+    app: guacamole-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: guacamole-web
+  template:
+    metadata:
+      labels:
+        app: guacamole-web
+    spec:
+      containers:
+      - name: guacamole-web
+        image: jilanigh/custom-guac-ui:1.2
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: GUACD_HOSTNAME
+          value: "guacd"
+        - name: GUACD_PORT
+          value: "4822"
+        - name: POSTGRESQL_HOSTNAME
+          value: "postgres"
+        - name: POSTGRESQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: postgres-db
+        - name: POSTGRESQL_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: postgres-user
+        - name: POSTGRESQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: postgres-password
+        # Required for Postgres support to be enabled
+        - name: POSTGRESQL_ENABLED
+          value: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: guacamole-web
+spec:
+  selector:
+    app: guacamole-web
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
+  type: NodePort
+  sessionAffinity: ClientIP
