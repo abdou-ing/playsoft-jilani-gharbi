@@ -1,0 +1,80 @@
+---
+- name: Install and configure Nginx reverse proxy for Guacamole
+  hosts: bastion
+  become: true
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install Nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+
+    - name: Ensure Nginx service is running and enabled
+      ansible.builtin.systemd:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Write Nginx reverse proxy configuration
+      ansible.builtin.copy:
+        dest: "{{ nginx_conf }}"
+        content: |
+          server {
+              listen 80 default_server;
+              server_name _;
+
+              # redirect root to /{{ guac_route }}/
+              location = / {
+                  return 301 /{{ guac_route }}/;
+              }
+
+              # proxy all /{{ guac_route }}/ requests
+              location /{{ guac_route }}/ {
+                  proxy_pass http://{{ private_server }}:8080/guacamole/;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Forwarded-For $remote_addr;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+          }
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reload Nginx
+
+    - name: Disable default site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload Nginx
+
+    - name: Enable Guacamole site
+      ansible.builtin.file:
+        src: "{{ nginx_conf }}"
+        dest: /etc/nginx/sites-enabled/guacamole
+        state: link
+        force: true
+      notify: Reload Nginx
+
+  handlers:
+    - name: Reload Nginx
+      block:
+        - name: Test Nginx configuration
+          ansible.builtin.command: nginx -t
+          register: nginx_test
+          failed_when: nginx_test.rc != 0
+          changed_when: false
+
+        - name: Reload Nginx
+          ansible.builtin.systemd:
+            name: nginx
+            state: reloaded

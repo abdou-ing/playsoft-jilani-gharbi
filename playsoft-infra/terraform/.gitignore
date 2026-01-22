@@ -1,0 +1,28 @@
+# Terraform state files 
+*.tfstate
+*.tfstate.*
+terraform.tfstate
+terraform.tfstate.backup
+
+# Terraform plugin directory and lock file
+.terraform/
+.terraform.lock.hcl
+
+# Environment-specific variable files
+env/*.tfvars
+
+# Local environment overrides (if used)
+.env
+*.env
+
+# Editor & IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+debug.log
