@@ -25,5 +25,3 @@ systemctl restart xrdp
 echo "startplasma-x11" > /home/instalab/.xsession
 chmod 600 /home/instalab/.xsession
 chown instalab:instalab /home/instalab/.xsession
-
-
