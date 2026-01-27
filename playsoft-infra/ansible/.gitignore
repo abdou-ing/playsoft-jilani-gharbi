@@ -1,2 +1,2 @@
-# Ansible
-playsoft-infra/ansible/inventory.ini
+vars.yml
+inventory.ini

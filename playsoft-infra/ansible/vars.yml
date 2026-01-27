@@ -1,3 +1,0 @@
-guac_route: guacamole
-private_server: 10.20.0.3   
-nginx_conf: /etc/nginx/sites-available/guacamole
