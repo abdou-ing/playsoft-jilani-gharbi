@@ -1,7 +1,3 @@
-# modules/edge-server/main.tf
-
-# If you want network here (optional), otherwise use root's network
-# resource "hcloud_network" "main" { ... }
 terraform {
   required_providers {
     hcloud = {
@@ -53,7 +49,3 @@ resource "hcloud_firewall_attachment" "edge_attach" {
   server_ids  = [hcloud_server.edge.id]
 }
 
-# Output: public IP
-output "public_ip" {
-  value = hcloud_server.edge.ipv4_address
-}

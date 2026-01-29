@@ -1,5 +1,3 @@
-# modules/edge-server/variables.tf
-
 variable "location" {
   type = string
 }

@@ -8,7 +8,7 @@ terraform {
 }
 
 data "hcloud_network" "main" {
-  name = "nw-jilani"  # ← Must match your actual network name in Hetzner
+  name = "nw-jilani"  
 }
 
 resource "hcloud_server" "guacamole" {
@@ -35,12 +35,4 @@ resource "hcloud_server" "guacamole" {
 data "hcloud_image" "guacamole_snapshot" {
   with_selector = "created_by=jilani,role=guacamole"
   most_recent   = true
-}
-
-# Optional: Internal firewall (attach to guacamole server)
-# resource "hcloud_firewall" "internal_fw" { ... }
-
-# Output: private IP
-output "private_ip" {
-  value = one(hcloud_server.guacamole.network).ip
 }
