@@ -1,7 +1,7 @@
 # main.tf
 
 data "hcloud_network" "main" {
-  name = "nw-jilani"  # ← Must match your actual network name in Hetzner
+  name = "nw-jilani" 
 }
 
 module "edge" {

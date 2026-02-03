@@ -6,6 +6,7 @@ terraform {
     }
   }
 }
+
 resource "hcloud_server" "edge" {
   name        = "hzn-bastion-jilani"
   image       = data.hcloud_image.bastion_snapshot.id

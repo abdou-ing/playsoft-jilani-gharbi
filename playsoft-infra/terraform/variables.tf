@@ -1,5 +1,5 @@
 variable "location" {
-  default = "hel1"
+  default = "nbg1"
 }
 
 variable "server_type" {
@@ -21,9 +21,4 @@ variable "guacamole_private_ip" {
   description = "Private IP of the Guacamole server"
   type        = string
   sensitive   = true
-}
-
-variable "network_id" {
-  description = "ID of the Hetzner network"
-  type        = string
 }
