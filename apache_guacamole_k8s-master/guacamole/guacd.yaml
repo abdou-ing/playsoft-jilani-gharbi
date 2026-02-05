@@ -15,6 +15,7 @@ spec:
       labels:
         app: guacd
     spec:
+      serviceAccountName: guacamole-sa
       containers:
       - name: guacd
         image: guacamole/guacd

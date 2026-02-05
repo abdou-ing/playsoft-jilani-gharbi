@@ -15,6 +15,7 @@ spec:
       labels:
         app: guacamole-web
     spec:
+      serviceAccountName: guacamole-sa
       containers:
       - name: guacamole-web
         image: jilanigh/custom-guac-ui:1.2
@@ -59,6 +60,5 @@ spec:
   ports:
     - port: 8080
       targetPort: 8080
-      nodePort: 30080
   type: NodePort
   sessionAffinity: ClientIP
