@@ -29,4 +29,6 @@ kind create cluster --config kind-config.yaml --name guacamole-cluster
 # Deploy Guacamole
 cd /opt/playsoft-jilani-gharbi/apache_guacamole_k8s-master/guacamole
 kubectl create namespace guacamole
-kubectl apply -f .
+
+kubectl apply -f . -n guacamole
+
