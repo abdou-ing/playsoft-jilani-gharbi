@@ -5,5 +5,5 @@ source "hcloud" "bastion" {
   location     = var.location
   ssh_username = var.ssh_username
   snapshot_name = var.snapshot_name
-  snapshot_labels = local.snapshot_labels
+  snapshot_labels = var.snapshot_labels
 }

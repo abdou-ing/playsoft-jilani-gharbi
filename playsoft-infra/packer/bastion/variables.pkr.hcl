@@ -27,3 +27,8 @@ variable "snapshot_name" {
   type    = string
   default = "hzn-bastion-jilani-snap{{timestamp}}"
 }
+
+variable "snapshot_labels" {
+  type        = map(string)
+  description = "Snapshot labels"
+}
