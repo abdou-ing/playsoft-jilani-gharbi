@@ -41,7 +41,7 @@ resource "hcloud_firewall" "edge_fw" {
     direction  = "in"
     protocol   = "tcp"
     port       = "22"
-    source_ips = ["0.0.0.0/0", "::/0"] # ← Consider restricting!
+    source_ips = [var.my_ip]
   }
 }
 

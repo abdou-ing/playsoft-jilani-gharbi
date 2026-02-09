@@ -19,3 +19,8 @@ variable "edge_private_ip" {
 variable "network_id" {
   type = string
 }
+
+variable "my_ip" {
+  description = "IP address from environment"
+  type        = string
+}

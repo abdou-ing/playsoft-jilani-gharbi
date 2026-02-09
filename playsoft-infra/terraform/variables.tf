@@ -22,3 +22,8 @@ variable "guacamole_private_ip" {
   type        = string
   sensitive   = true
 }
+
+variable "my_ip" {
+  description = "IP address from environment"
+  type        = string
+}

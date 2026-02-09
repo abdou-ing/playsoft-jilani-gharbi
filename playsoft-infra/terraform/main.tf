@@ -12,6 +12,7 @@ module "edge" {
   ssh_key_name    = var.ssh_key_name
   edge_private_ip = var.edge_private_ip
   network_id      = data.hcloud_network.main.id
+  my_ip           = var.my_ip
 }
 
 module "guacamole" {
