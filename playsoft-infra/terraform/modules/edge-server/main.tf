@@ -43,6 +43,12 @@ resource "hcloud_firewall" "edge_fw" {
     port       = "22"
     source_ips = [var.my_ip]
   }
+  rule {
+    direction  = "in"
+    protocol   = "tcp"
+    port       = "80"
+    source_ips = [var.my_ip]
+  }
 }
 
 resource "hcloud_firewall_attachment" "edge_attach" {
