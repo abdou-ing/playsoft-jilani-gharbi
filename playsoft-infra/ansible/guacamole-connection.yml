@@ -4,8 +4,8 @@
   connection: local
   gather_facts: false
   vars:
-    guac_api_url: "http://65.21.62.157/guacamole/api"
-    guac_web_url: "http://65.21.62.157/guacamole"
+    guac_api_url: "http://<ip@>/guacamole/api"
+    guac_web_url: "http://<ip@>/guacamole"
     admin_user: "guacadmin"
     admin_pass: "guacadmin"
     
