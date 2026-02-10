@@ -2,40 +2,50 @@ variable "proxmox_api_url" {
   type = string
 }
 
-variable "proxmox_api_token_id" {
+variable "proxmox_username" {
   type = string
 }
 
-variable "proxmox_api_token_secret" {
+variable "proxmox_token" {
   type      = string
   sensitive = true
 }
 
-variable "proxmox_node" {
-  type    = string
-}
-
-variable "source_template_id" {
-  type    = number
-  default = 110
-}
-
-variable "new_template_id" {
-  type    = number
-  default = 200
-}
-
-variable "new_template_name" {
-  type    = string
-  default = "kali-vnc"
-}
-
-variable "ssh_user" {
+variable "ssh_username" {
   type    = string
   default = "bob"
 }
 
 variable "ssh_password" {
   type      = string
+  default   = "passwd" #needs to change
   sensitive = true
+}
+
+variable "proxmox_node" {
+  type = string
+}
+
+variable "source_vm_id" {
+  type = number
+}
+
+variable "new_vm_id" {
+  type = number
+}
+
+variable "template_name" {
+  type = string
+}
+
+variable "cpu_cores" {
+  type = number
+}
+
+variable "memory" {
+  type = number
+}
+
+variable "disk_size" {
+  type = string
 }

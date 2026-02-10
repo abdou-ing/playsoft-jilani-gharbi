@@ -1,27 +1,19 @@
 source "proxmox-clone" "kali" {
   proxmox_url = var.proxmox_api_url
-  username    = var.proxmox_api_token_id
-  token       = var.proxmox_api_token_secret
+  username    = var.proxmox_username
+  token       = var.proxmox_token
 
-  node = var.proxmox_node
-
-  clone_vm_id = var.source_template_id
-
-  vm_id   = var.new_template_id
-  vm_name = var.new_template_name
-
-  ssh_username = var.ssh_user
+  ssh_username = var.ssh_username
   ssh_password = var.ssh_password
 
+
+  node                     = var.proxmox_node
+  clone_vm_id              = var.source_vm_id
+  vm_id                    = var.new_vm_id
+  template_name            = var.template_name
+  full_clone               = true
   insecure_skip_tls_verify = true
-  ssh_timeout  = "10m"
-}
 
-build {
-  name    = "kali-vnc-template"
-  sources = ["source.proxmox-clone.kali"]
-
-  provisioner "shell" {
-    script = "provision/configure_vnc.sh"
-  }
+  cores  = var.cpu_cores
+  memory = var.memory
 }
