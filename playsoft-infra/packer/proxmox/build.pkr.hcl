@@ -1,11 +1,7 @@
 source "proxmox-clone" "kali" {
-  proxmox_url = var.proxmox_api_url
-  username    = var.proxmox_username
-  token       = var.proxmox_token
-
-  ssh_username = var.ssh_username
-  ssh_password = var.ssh_password
-
+  proxmox_url              = var.proxmox_api_url
+  username                 = var.proxmox_username
+  token                    = var.proxmox_token
 
   node                     = var.proxmox_node
   clone_vm_id              = var.source_vm_id
@@ -16,4 +12,14 @@ source "proxmox-clone" "kali" {
 
   cores  = var.cpu_cores
   memory = var.memory
+
+  # Private VM
+  ssh_host               = "prv_ip"
+  ssh_username           = "bob"
+  ssh_private_key_file   = "~/.ssh/jilani"
+
+  # Bastion (Proxmox public IP)
+  ssh_bastion_host             = "pub_ip"
+  ssh_bastion_username         = var.ssh_username
+  ssh_bastion_private_key_file = "~/.ssh/jilani"
 }
