@@ -6,9 +6,9 @@ useradd -m -s /bin/bash instalab
 echo "instalab:instalab" | chpasswd
 
 # Give 'instalab' sudo privileges
-usermod -aG sudo instalab
-echo "instalab ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/instalab
-chmod 440 /etc/sudoers.d/instalab
+# usermod -aG sudo instalab
+# echo "instalab ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/instalab
+# chmod 440 /etc/sudoers.d/instalab
 
 # --- Step 2: Install full KDE desktop and XRDP ---
 apt update -y
