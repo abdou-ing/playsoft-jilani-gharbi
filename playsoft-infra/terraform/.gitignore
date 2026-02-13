@@ -8,6 +8,8 @@ terraform.tfstate.backup
 .terraform/
 .terraform.lock.hcl
 
+
+
 # Environment-specific variable files
 env/*.tfvars
 
