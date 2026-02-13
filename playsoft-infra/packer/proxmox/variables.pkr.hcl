@@ -4,7 +4,7 @@ variable "proxmox_api_url" {
 
 variable "proxmox_username" {
   type = string
-  default = "username in the format user@pve"
+  default = "username on proxmox"
 }
 
 variable "proxmox_token" {
@@ -14,14 +14,9 @@ variable "proxmox_token" {
 
 variable "ssh_username" {
   type    = string
-  default = "nom d'utilisateur pour la connexion ssh à la VM ici"
+  default = "ssh username to access Proxmox and the VM"
 }
 
-# variable "ssh_password" {
-#   type      = string
-#   default   = "passwd" #needs to change
-#   sensitive = true
-# }
 
 variable "proxmox_node" {
   type = string
