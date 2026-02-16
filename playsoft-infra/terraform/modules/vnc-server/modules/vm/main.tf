@@ -11,6 +11,4 @@ resource "proxmox_virtual_environment_vm" "vm" {
     full         = true
     datastore_id = "local"
   }
-
-  
 }
