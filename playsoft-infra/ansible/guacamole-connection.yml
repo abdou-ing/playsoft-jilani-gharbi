@@ -1,0 +1,223 @@
+---
+- name: Create User and Direct VNC Access Link
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    guac_api_url: "http://<ip@>/guacamole/api"
+    guac_web_url: "http://<ip@>/guacamole"
+    admin_user: "guacadmin"
+    admin_pass: "guacadmin"
+    
+    # User to create
+    new_user: "jilani"
+    new_pass: "root"
+    
+    # VNC Connection details
+    connection_name: "Direct-VNC-Access"
+    host_ip: "37.27.216.135"
+    vnc_port: 5901
+    vnc_password: "root"
+
+  tasks:
+    # Get admin token
+    - name: Get admin authentication token
+      uri:
+        url: "{{ guac_api_url }}/tokens"
+        method: POST
+        headers:
+          Content-Type: "application/x-www-form-urlencoded"
+        body: "username={{ admin_user }}&password={{ admin_pass }}"
+        return_content: yes
+        validate_certs: no
+      register: auth_response
+
+    - name: Set auth facts
+      set_fact:
+        guac_token: "{{ auth_response.json.authToken }}"
+        guac_data_source: "{{ auth_response.json.dataSource }}"
+
+    # Clean up: Try to delete existing user if it exists
+    - name: List all existing users
+      uri:
+        url: "{{ guac_api_url }}/session/data/{{ guac_data_source }}/users"
+        method: GET
+        headers:
+          Guacamole-Token: "{{ guac_token }}"
+        return_content: yes
+        validate_certs: no
+      register: existing_users_list
+      ignore_errors: yes
+
+    - name: Delete existing user if found
+      uri:
+        url: "{{ guac_api_url }}/session/data/{{ guac_data_source }}/users/{{ item.key }}"
+        method: DELETE
+        headers:
+          Guacamole-Token: "{{ guac_token }}"
+        validate_certs: no
+      loop: "{{ existing_users_list.json|dict2items|selectattr('value.username', 'equalto', new_user)|list }}"
+      when: existing_users_list is succeeded
+      ignore_errors: yes
+      loop_control:
+        label: "{{ item.value.username }}"
+
+    # Create VNC connection
+    - name: Create VNC connection
+      uri:
+        url: "{{ guac_api_url }}/session/data/{{ guac_data_source }}/connections"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+          Guacamole-Token: "{{ guac_token }}"
+        body:
+          parentIdentifier: "ROOT"
+          name: "{{ connection_name }}"
+          protocol: "vnc"
+          parameters:
+            hostname: "{{ host_ip }}"
+            port: "{{ vnc_port }}"
+            password: "{{ vnc_password }}"
+            color-depth: "24"
+          attributes:
+            max-connections: "10"
+        body_format: json
+        return_content: yes
+        validate_certs: no
+      register: connection_result
+
+    - name: Get connection ID
+      set_fact:
+        connection_id: "{{ connection_result.json.identifier }}"
+
+    # Create new user
+    - name: Create new user
+      uri:
+        url: "{{ guac_api_url }}/session/data/{{ guac_data_source }}/users"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+          Guacamole-Token: "{{ guac_token }}"
+        body:
+          username: "{{ new_user }}"
+          password: "{{ new_pass }}"
+          attributes:
+            disabled: ""
+            expired: ""
+        body_format: json
+        return_content: yes
+        validate_certs: no
+      register: user_create_result
+      ignore_errors: yes
+
+    # Get the newly created user ID
+    - name: Get all users to find new user ID
+      uri:
+        url: "{{ guac_api_url }}/session/data/{{ guac_data_source }}/users"
+        method: GET
+        headers:
+          Guacamole-Token: "{{ guac_token }}"
+        return_content: yes
+        validate_certs: no
+      register: all_users
+      when: user_create_result is succeeded
+      ignore_errors: yes
+
+    - name: Extract new user ID
+      set_fact:
+        new_user_id: "{{ all_users.json | dict2items | selectattr('value.username', 'equalto', new_user) | map(attribute='key') | first | default('') }}"
+      when: all_users is succeeded
+
+    # Grant connection permission to user
+    - name: Grant connection permission to user
+      uri:
+        url: "{{ guac_api_url }}/session/data/{{ guac_data_source }}/users/{{ new_user_id }}/permissions"
+        method: PATCH
+        headers:
+          Content-Type: "application/json"
+          Guacamole-Token: "{{ guac_token }}"
+        body:
+          - op: "add"
+            path: "/connectionPermissions/{{ connection_id }}"
+            value: ["READ"]
+        body_format: json
+        validate_certs: no
+      when: new_user_id != ""
+      ignore_errors: yes
+
+    # Create sharing profile for direct access
+    - name: Create sharing profile
+      uri:
+        url: "{{ guac_api_url }}/session/data/{{ guac_data_source }}/sharingProfiles"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+          Guacamole-Token: "{{ guac_token }}"
+        body:
+          primaryConnectionIdentifier: "{{ connection_id }}"
+          name: "public-share"
+          parameters: {}
+          attributes:
+            max-connections: "5"
+            max-connections-per-user: "1"
+        body_format: json
+        return_content: yes
+        validate_certs: no
+      register: sharing_result
+      ignore_errors: yes
+
+    # Get user token for direct login
+    - name: Get user authentication token
+      uri:
+        url: "{{ guac_api_url }}/tokens"
+        method: POST
+        headers:
+          Content-Type: "application/x-www-form-urlencoded"
+        body: "username={{ new_user }}&password={{ new_pass }}"
+        return_content: yes
+        validate_certs: no
+      register: user_token_response
+      ignore_errors: yes
+
+    # Generate URLs using proper Jinja2 syntax
+    - name: Generate sharing URL
+      set_fact:
+        sharing_url: "{{ guac_web_url }}/#/client/{{ guac_token }}/s/{{ sharing_result.json.identifier }}"
+      when: sharing_result is succeeded
+
+    - name: Generate user direct URL
+      set_fact:
+        user_direct_url: "{{ guac_web_url }}/#/client/{{ user_token_response.json.authToken }}/c/{{ connection_id }}"
+      when: user_token_response is succeeded
+
+    - name: Generate admin direct URL
+      set_fact:
+        admin_direct_url: "{{ guac_web_url }}/#/client/{{ guac_token }}/c/{{ connection_id }}"
+
+    - name: Generate parameter URLs
+      set_fact:
+        user_param_url: "{{ guac_web_url }}/?username={{ new_user }}&password={{ new_pass }}&id={{ connection_id }}"
+        admin_param_url: "{{ guac_web_url }}/?username={{ admin_user }}&password={{ admin_pass }}&id={{ connection_id }}"
+
+    # Combine all URLs
+    - name: Combine all URLs
+      set_fact:
+        all_urls: |
+          🔗 DIRECT ACCESS URLS:         
+             {{ sharing_url }}
+    - name: Display all URLs
+      debug:
+        msg: "{{ all_urls }}"
+
+    # Test VNC server
+    - name: Test VNC server connectivity
+      wait_for:
+        host: "{{ host_ip }}"
+        port: "{{ vnc_port }}"
+        timeout: 5
+      register: vnc_test
+      ignore_errors: yes
+
+    - name: Display VNC server status
+      debug:
+        msg: "VNC Server Status: {{ host_ip }}:{{ vnc_port }} is {{ '✅ REACHABLE' if vnc_test.failed == false else '❌ NOT REACHABLE' }}"

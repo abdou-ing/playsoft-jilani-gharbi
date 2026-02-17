@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: guacamole-web
+  namespace: guacamole
   labels:
     app: guacamole-web
 spec:
@@ -14,6 +15,7 @@ spec:
       labels:
         app: guacamole-web
     spec:
+      serviceAccountName: guacamole-sa
       containers:
       - name: guacamole-web
         image: jilanigh/custom-guac-ui:1.2
@@ -51,12 +53,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: guacamole-web
+  namespace: guacamole
 spec:
   selector:
     app: guacamole-web
   ports:
     - port: 8080
       targetPort: 8080
-      nodePort: 30080
   type: NodePort
   sessionAffinity: ClientIP

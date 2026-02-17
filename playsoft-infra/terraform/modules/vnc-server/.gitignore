@@ -1,0 +1,9 @@
+# Terraform state files 
+*.tfstate
+*.tfstate.*
+terraform.tfstate
+terraform.tfstate.backup
+
+# Terraform plugin directory and lock file
+.terraform/
+.terraform.lock.hcl

@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: guacd
+  namespace: guacamole
   labels:
     app: guacd
 spec:
@@ -14,6 +15,7 @@ spec:
       labels:
         app: guacd
     spec:
+      serviceAccountName: guacamole-sa
       containers:
       - name: guacd
         image: guacamole/guacd
@@ -24,14 +26,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: guacd
-  labels:
-    app: guacd
+  name: guacd-clusterip
+  namespace: guacamole
 spec:
+  selector:
+    app: guacd
   ports:
   - port: 4822
     targetPort: 4822
-    name: guacd
-  selector:
-    app: guacd
-  clusterIP: None
+    protocol: TCP
+  type: ClusterIP
+

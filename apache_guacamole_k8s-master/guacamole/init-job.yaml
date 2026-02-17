@@ -2,9 +2,11 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: guacamole-init-db
+  namespace: guacamole
 spec:
   template:
     spec:
+      serviceAccountName: guacamole-sa
       volumes:
       - name: init-script
         emptyDir: {}

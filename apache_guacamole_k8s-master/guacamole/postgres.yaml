@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: postgres-secret
+  namespace: guacamole
 type: Opaque
 stringData:
   postgres-password: some_password
@@ -12,6 +13,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres
+  namespace: guacamole
   labels:
     app: postgres
 spec:
@@ -26,6 +28,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgres
+  namespace: guacamole
 spec:
   selector:
     matchLabels:
