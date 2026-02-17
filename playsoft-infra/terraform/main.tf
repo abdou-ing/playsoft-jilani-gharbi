@@ -24,3 +24,16 @@ module "guacamole" {
   guacamole_private_ip = var.guacamole_private_ip
   network_id           = data.hcloud_network.main.id
 }
+
+module "centos" {
+  source = "./modules/centos-server"
+
+  location          = var.location
+  server_type       = var.server_type
+  ssh_key_name      = var.ssh_key_name
+  centos_private_ip = var.centos_private_ip
+  edge_private_ip   = var.edge_private_ip
+  my_ip             = var.my_ip
+  network_id        = data.hcloud_network.main.id
+}
+
