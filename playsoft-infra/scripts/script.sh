@@ -14,7 +14,7 @@ PKR_VARS_FILE="dev.pkrvars.hcl"
 echo "🚀 Starting Packer & Terraform automation workflow..."
 echo "-----------------------------------------------------"
 
-# ---- PACKER BUILD #1 ----
+# ---- PACKER BUILD BASTION #1 ----
 echo "📦 Running packer build #1..."
 cd ~/playsoft-jilani-gharbi/playsoft-infra/packer/bastion
 packer build \
@@ -23,9 +23,9 @@ packer build \
   .
  
 
-echo "✅ Packer build #1 complete."
+echo "✅ Packer build bastion #1 complete."
 
-# ---- PACKER BUILD #2 ----
+# ---- PACKER BUILD GUACAMOLE #2 ----
 echo "📦 Running packer build #2..."
 cd ~/playsoft-jilani-gharbi/playsoft-infra/packer/guacamole
 packer build \
@@ -33,7 +33,7 @@ packer build \
   -var-file="$PKR_VARS_FILE" \
   .
 
-echo "✅ Packer build #2 complete."
+echo "✅ Packer build guacamole #2 complete."
 # ---- TERRAFORM APPLY ----
 echo "🌍 Running terraform apply..."
  cd ~/playsoft-jilani-gharbi/playsoft-infra/terraform
@@ -43,5 +43,4 @@ terraform apply \
   -var="my_ip=$MY_IP" \
   -var-file="$TFVARS_FILE" \
   -auto-approve
-
 echo "🎉 Deployment complete!"

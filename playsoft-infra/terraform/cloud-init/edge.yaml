@@ -1,12 +1,61 @@
 #cloud-config
+
+package_update: true
+packages:
+  - nginx
+  - networkd-dispatcher
+
 write_files:
+  # Ensure networkd-dispatcher folder exists
   - path: /etc/networkd-dispatcher/routable.d/10-eth0-post-up
+    permissions: '0755'
     content: |
       #!/bin/bash
-      
       echo 1 > /proc/sys/net/ipv4/ip_forward
       iptables -t nat -A POSTROUTING -s '10.20.0.0/24' -o eth0 -j MASQUERADE
+
+  # NGINX auto-config script
+  - path: /usr/local/bin/configure-nginx-public-ip.sh
+    owner: root:root
     permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      PUBLIC_IP=$(curl -s http://169.254.169.254/metadata/v1/public-ipv4 || true)
+
+      if [ -z "$PUBLIC_IP" ]; then
+        echo "Could not get public IP from metadata." >&2
+        exit 1
+      fi
+
+      cat >/etc/nginx/sites-available/guacamole <<EOF
+      server {
+        listen 80;
+        server_name ${PUBLIC_IP};
+
+        location / {
+          proxy_pass http://10.20.0.3:8080/guacamole/;
+          proxy_http_version 1.1;
+
+          proxy_set_header Upgrade \$http_upgrade;
+          proxy_set_header Connection "upgrade";
+          proxy_set_header Host \$host;
+          proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto \$scheme;
+        }
+      }
+      EOF
+
+      rm -f /etc/nginx/sites-enabled/default
+      ln -sf /etc/nginx/sites-available/guacamole /etc/nginx/sites-enabled/guacamole
+
+      nginx -t
+      systemctl restart nginx
 
 runcmd:
+  - mkdir -p /etc/networkd-dispatcher/routable.d
+  - chmod +x /etc/networkd-dispatcher/routable.d/10-eth0-post-up
+  - systemctl restart networkd-dispatcher
+  - /usr/local/bin/configure-nginx-public-ip.sh
   - reboot
