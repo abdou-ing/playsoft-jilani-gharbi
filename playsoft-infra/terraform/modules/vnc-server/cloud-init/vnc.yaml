@@ -1,0 +1,26 @@
+#cloud-config
+package_update: true
+package_upgrade: false
+
+packages:
+  - xfce4
+  - xfce4-goodies
+
+runcmd:
+  # Create VNC directory
+  - mkdir -p /home/ubuntu/.vnc
+  - chown -R ubuntu:ubuntu /home/ubuntu/.vnc
+
+  # Create VNC xstartup file
+  - |
+    cat << 'EOF' > /home/ubuntu/.vnc/xstartup
+    #!/bin/sh
+    unset SESSION_MANAGER
+    unset DBUS_SESSION_BUS_ADDRESS
+    [ -r $HOME/.Xresources ] && xrdb $HOME/.Xresources
+    vncconfig -iconic &
+    startxfce4 &
+    EOF
+
+  # Make script executable
+  - chmod +x /home/ubuntu/.vnc/xstartup

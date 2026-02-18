@@ -35,7 +35,7 @@ variable "my_ip" {
 }
 
 variable "server_count" {
-  description = "Number of servers (unused but present in tfvars)"
+  description = "Number of servers"
   default     = 1
 }
 
