@@ -14,12 +14,12 @@ source "proxmox-clone" "kali" {
   memory = var.memory
 
   # Private VM
-  ssh_host               = "prv_ip"
+  ssh_host               = "10.0.x.x"
   ssh_username           = "bob"
-  ssh_private_key_file   = "~/.ssh/jilani"
+  ssh_private_key_file   = "path of private key to inject into the VM"
 
   # Bastion (Proxmox public IP)
-  ssh_bastion_host             = "pub_ip"
+  ssh_bastion_host             = "123.45.x.x"
   ssh_bastion_username         = var.ssh_username
-  ssh_bastion_private_key_file = "~/.ssh/jilani"
+  ssh_bastion_private_key_file = "path of private key to access Proxmox"
 }
