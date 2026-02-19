@@ -26,14 +26,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: guacd-clusterip
-  namespace: guacamole
-spec:
-  selector:
+  name: guacd
+  labels:
     app: guacd
+spec:
   ports:
   - port: 4822
     targetPort: 4822
-    protocol: TCP
-  type: ClusterIP
+    name: guacd
+  selector:
+    app: guacd
+  clusterIP: None
 
