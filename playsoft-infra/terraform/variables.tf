@@ -23,7 +23,19 @@ variable "guacamole_private_ip" {
   sensitive   = true
 }
 
+variable "centos_private_ip" {
+  description = "Private IP of the CentOS server"
+  type        = string
+  sensitive   = true
+}
+
 variable "my_ip" {
   description = "IP address from environment"
   type        = string
 }
+
+variable "server_count" {
+  description = "Number of servers"
+  default     = 1
+}
+

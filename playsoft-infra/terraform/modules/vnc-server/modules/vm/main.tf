@@ -12,3 +12,4 @@ resource "proxmox_virtual_environment_vm" "vm" {
     datastore_id = "local"
   }
 }
+
