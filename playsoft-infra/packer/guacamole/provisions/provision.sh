@@ -20,7 +20,7 @@ systemctl enable --now docker
 
 # Clone project
 mkdir -p /opt
-git clone -b dev https://github.com/abdou-ing/playsoft-jilani-gharbi.git /opt/playsoft-jilani-gharbi
+git clone -b feature/guacamole https://github.com/abdou-ing/playsoft-jilani-gharbi.git /opt/playsoft-jilani-gharbi
 cd /opt/playsoft-jilani-gharbi/apache_guacamole_k8s-master
 
 # Create Kind cluster
