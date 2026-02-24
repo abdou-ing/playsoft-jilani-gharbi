@@ -6,13 +6,13 @@ packages:
   - networkd-dispatcher
 
 write_files:
-  # Ensure networkd-dispatcher folder exists
   - path: /etc/networkd-dispatcher/routable.d/10-eth0-post-up
-    permissions: '0755'
     content: |
       #!/bin/bash
+      
       echo 1 > /proc/sys/net/ipv4/ip_forward
       iptables -t nat -A POSTROUTING -s '10.20.0.0/24' -o eth0 -j MASQUERADE
+    permissions: '0755'
 
   # NGINX auto-config script
   - path: /usr/local/bin/configure-nginx-public-ip.sh
@@ -54,8 +54,5 @@ write_files:
       systemctl restart nginx
 
 runcmd:
-  - mkdir -p /etc/networkd-dispatcher/routable.d
-  - chmod +x /etc/networkd-dispatcher/routable.d/10-eth0-post-up
-  - systemctl restart networkd-dispatcher
   - /usr/local/bin/configure-nginx-public-ip.sh
   - reboot
