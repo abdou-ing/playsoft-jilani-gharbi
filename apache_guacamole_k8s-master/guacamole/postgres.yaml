@@ -5,9 +5,9 @@ metadata:
   namespace: guacamole
 type: Opaque
 stringData:
-  postgres-password: some_password
-  postgres-user: guacamole_user
-  postgres-db: guacamole_db
+  postgres-password: ${POSTGRES_PASSWORD}
+  postgres-user: ${POSTGRES_USER}
+  postgres-db: ${POSTGRES_DB}
 ---
 apiVersion: v1
 kind: Service
