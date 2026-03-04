@@ -18,13 +18,8 @@
   # HANDLERS
   ######################################################################
   handlers:
-    - name: stop vm
-      listen: restart_vm
-      command: "qm stop {{ vmid }}"
-
-    - name: start vm
-      listen: restart_vm
-      command: "qm start {{ vmid }}"
+    - name: restart_vm
+      command: /bin/bash -c "qm stop {{ vmid }} && qm start {{ vmid }}"
 
   ######################################################################
   # TASKS
@@ -100,23 +95,15 @@
     ######################################################################
     # 3) FIREWALL RULE FOR VNC PORT (only if not already open)
     ######################################################################
-    - name: Check if iptables rule exists
-      shell: |
-        iptables -C INPUT -p tcp --dport {{ firewall_port }} -j ACCEPT 2>/dev/null \
-          && echo present || echo absent
-      args:
-        executable: /bin/bash
-      register: ipt_check
-      changed_when: false
-
-    - name: Add iptables rule if missing
-      command: "iptables -A INPUT -p tcp --dport {{ firewall_port }} -j ACCEPT"
-      when: ipt_check.stdout.strip() == "present"
-      changed_when: false
-
-    - name: Add iptables rule if missing (corrected)
-      command: "iptables -A INPUT -p tcp --dport {{ firewall_port }} -j ACCEPT"
-      when: ipt_check.stdout.strip() == "absent"
+    - name: Allow VNC port through firewall (idempotent)
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: "{{ firewall_port }}"
+        jump: ACCEPT
+        state: present
+        ip_version: ipv4
+      become: true
       notify: restart_vm
       #using ansible iptables 
 
