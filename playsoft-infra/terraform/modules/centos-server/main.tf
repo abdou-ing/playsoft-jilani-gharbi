@@ -13,6 +13,8 @@ resource "hcloud_server" "centos" {
   server_type = var.server_type
   location    = var.location
   ssh_keys    = [var.ssh_key_name]
+  
+  
 
   #user_data = file("${path.module}/../../cloud-init/centos.yaml")
 
