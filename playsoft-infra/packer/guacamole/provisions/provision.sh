@@ -20,7 +20,7 @@ systemctl enable --now docker
 
 # Clone project
 mkdir -p /opt
-git clone -b feature/guacamole https://github.com/abdou-ing/playsoft-jilani-gharbi.git /opt/playsoft-jilani-gharbi
+git clone -b feature/terraform https://github.com/abdou-ing/playsoft-jilani-gharbi.git /opt/playsoft-jilani-gharbi
 cd /opt/playsoft-jilani-gharbi/apache_guacamole_k8s-master
 
 # Create Kind cluster
@@ -30,5 +30,6 @@ kind create cluster --config kind-config.yaml --name guacamole-cluster
 cd /opt/playsoft-jilani-gharbi/apache_guacamole_k8s-master/guacamole
 kubectl create namespace guacamole
 
-kubectl apply -f . -n guacamole
+kubectl apply -n guacamole -f .
+
 
