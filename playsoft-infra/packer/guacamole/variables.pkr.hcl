@@ -15,7 +15,7 @@ variable "server_type" {
 
 variable "location" {
   type    = string
-  default = "hel1"
+  default = "nbg1"
 }
 
 variable "ssh_username" {
