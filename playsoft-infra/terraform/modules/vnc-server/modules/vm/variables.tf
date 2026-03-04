@@ -11,5 +11,9 @@ variable "disk_size" {
 
 variable "storage" {}
 variable "bridge" {}
+variable "vm_id" {
+  type        = number
+  description = "The VM ID to assign on Proxmox"
+}
 
 variable "ssh_public_key" {}
