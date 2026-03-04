@@ -29,3 +29,8 @@ variable "centos_private_ip" {
   description = "Private IP of the CentOS server"
   type        = string
 }
+
+variable "server_count" {
+  description = "Number of servers"
+  default     = 0
+}

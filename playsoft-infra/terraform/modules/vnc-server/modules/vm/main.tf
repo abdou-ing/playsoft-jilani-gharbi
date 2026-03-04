@@ -1,6 +1,7 @@
 resource "proxmox_virtual_environment_vm" "vm" {
   node_name = var.node_name
   name      = var.vm_name
+  vm_id     = var.vm_id
 
   agent {
     enabled = false

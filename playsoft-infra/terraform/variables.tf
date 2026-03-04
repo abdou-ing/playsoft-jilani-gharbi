@@ -36,6 +36,6 @@ variable "my_ip" {
 
 variable "server_count" {
   description = "Number of servers"
-  default     = 1
+  default     = 0
 }
 
