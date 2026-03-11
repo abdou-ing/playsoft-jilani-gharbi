@@ -1,0 +1,52 @@
+---
+# ---------------------------------------------------------------------------
+# 1. Proxmox: Configure VNC access on the VM
+# ---------------------------------------------------------------------------
+- name: Configure VNC on Proxmox
+  hosts: proxmox
+  become: true
+  gather_facts: true
+  tags: [vnc_setup]
+  roles:
+    - vnc_setup
+
+# ---------------------------------------------------------------------------
+# 2. Bastion: Nginx reverse proxy in front of Guacamole
+# ---------------------------------------------------------------------------
+- name: Setup Nginx reverse proxy for Guacamole
+  hosts: bastion
+  become: true
+  tags: [nginx_guacamole]
+  roles:
+    - nginx_guacamole
+
+# ---------------------------------------------------------------------------
+# 3. Target servers: KDE desktop (only when KDE=true)
+# ---------------------------------------------------------------------------
+- name: Configure KDE desktop on target servers
+  hosts: test_servers
+  become: true
+  tags: [kde_desktop]
+  roles:
+    - kde_desktop
+
+# ---------------------------------------------------------------------------
+# 4. Localhost: Register Guacamole connection + user via API
+# ---------------------------------------------------------------------------
+- name: Register Guacamole connection and user
+  hosts: localhost
+  become: false
+  tags: [guacamole_connection]
+  roles:
+    - guacamole_connection
+
+# ---------------------------------------------------------------------------
+# 5. Localhost: Generate and print the direct Guacamole access URL
+# ---------------------------------------------------------------------------
+- name: Print direct Guacamole access URL
+  hosts: localhost
+  become: false
+  tags: [guacamole_url]
+  roles:
+    - guacamole_url
+
