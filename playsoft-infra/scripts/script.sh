@@ -92,7 +92,7 @@ echo "✅ Proxmox Terraform apply completed."
 
 echo "🌍 Running Ansible playbook to configure Proxmox VMs..."
 cd ~/playsoft-jilani-gharbi/playsoft-infra/ansible
-ansible-playbook proxmox-vnc-setup.yml
+ansible-playbook site.yml --tags vnc_setup
 echo "✅ Proxmox VMs configured successfully."
 
 # -------------------------------------------------------------------
@@ -103,10 +103,15 @@ echo "🌍 Running Ansible playbook to create VNC connections..."
 cd ~/playsoft-jilani-gharbi/playsoft-infra/ansible
 
 # Background port-forwarding for Guacamole web UI
+# (needed so Ansible can reach the Guacamole API at http://<edge-ip>:8080)
 ssh -o StrictHostKeyChecking=accept-new guacamole \
   "setsid kubectl port-forward -n guacamole svc/guacamole-web 8080:8080 --address 0.0.0.0 >/dev/null 2>&1 < /dev/null &"
 
+# Small wait to let the port-forward establish before Ansible hits the API
+sleep 3
 
-ansible-playbook guacamole-connection.yml
+ansible-playbook site.yml --tags guacamole_connection
+
+ansible-playbook site.yml --tags guacamole_url
 
 echo "🎉 Deployment complete!"
