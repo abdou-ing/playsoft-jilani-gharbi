@@ -34,8 +34,7 @@
         full_name: "{{ user_full_name }}"
         email: "{{ user_email }}"
         organization: "{{ user_organization }}"
-        allowed_connections:
-          - "{{ connection_name }}"
+        allowed_connections: "{{ user_allowed_connections }}"
       register: _user_info
 
     - debug:
