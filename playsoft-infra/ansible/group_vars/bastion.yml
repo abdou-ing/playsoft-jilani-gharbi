@@ -1,0 +1,4 @@
+---
+# Variables for the [bastion] group
+nginx_conf: /etc/nginx/sites-available/guacamole
+private_server: 10.20.0.3
