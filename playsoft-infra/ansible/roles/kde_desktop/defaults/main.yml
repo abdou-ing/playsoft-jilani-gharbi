@@ -1,0 +1,7 @@
+---
+# Toggle KDE setup on/off
+KDE: false
+
+# User to create for KDE session
+kde_user: kdeuser
+kde_password_plain: 123456
