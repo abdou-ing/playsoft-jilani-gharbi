@@ -1,0 +1,8 @@
+---
+# Path to root Terraform output JSON (contains edge_public_ip)
+tf_output_path_root: "~/playsoft-jilani-gharbi/playsoft-infra/terraform/tf_output.json"
+
+# Guacamole user credentials to generate the token
+# These default to the same vars as guacamole_connection role (user_username / user_password)
+guac_token_username: "{{ user_username }}"
+guac_token_password: "{{ user_password }}"

@@ -1,0 +1,6 @@
+---
+# Path for the Nginx site config file
+nginx_conf: /etc/nginx/sites-available/guacamole
+
+# Internal IP of the Guacamole server
+private_server: 10.20.0.3

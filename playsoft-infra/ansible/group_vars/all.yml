@@ -1,0 +1,27 @@
+---
+# ──────────────────────────────────────────────
+# Shared / global variables available to all hosts
+# ──────────────────────────────────────────────
+
+# Guacamole route name
+guac_route: guacamole
+
+# Guacamole admin credentials
+auth_username: guacadmin
+auth_password: guacadmin
+
+# Connection defaults (override per play or host_vars)
+connection_name: exam-1
+protocol: vnc
+hostname: 138.201.200.168
+vnc_connection_port: 5901
+
+# Guacamole user variables
+user_username: test1
+user_password: test1
+user_full_name: "Jilani Gharbi"
+user_email: "gharbijilani001@gmail.com"
+user_organization: "playsoft"
+user_allowed_connections:
+  - exam-1
+  - exam-2

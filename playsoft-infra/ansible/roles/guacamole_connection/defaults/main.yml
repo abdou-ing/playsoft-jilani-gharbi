@@ -1,0 +1,21 @@
+---
+# Guacamole admin credentials
+auth_username: ""
+auth_password: ""
+
+# Connection parameters
+connection_name: ""
+protocol: ""
+hostname: ""
+vnc_connection_port: ""
+
+# Guacamole user settings
+user_username: ""
+user_password: ""
+user_full_name: ""
+user_email: ""
+user_organization: ""
+user_allowed_connections: []
+
+# Path to Terraform output JSON (edge public IP)
+tf_output_path_root: "~/playsoft-jilani-gharbi/playsoft-infra/terraform/tf_output.json"

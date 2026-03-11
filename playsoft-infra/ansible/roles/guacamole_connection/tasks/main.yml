@@ -1,0 +1,36 @@
+---
+- name: Load Terraform output (edge public IP)
+  set_fact:
+    tf: "{{ lookup('file', tf_output_path_root) | from_json }}"
+
+- name: Add a new VNC connection in Guacamole
+  scicore.guacamole.guacamole_connection:
+    base_url: "http://{{ tf.edge_public_ip.value }}"
+    auth_username: "{{ auth_username }}"
+    auth_password: "{{ auth_password }}"
+    connection_name: "{{ connection_name }}"
+    protocol: "{{ protocol }}"
+    hostname: "{{ hostname }}"
+    port: "{{ vnc_connection_port }}"
+  register: _connection_info
+
+- name: Debug connection info
+  debug:
+    var: _connection_info
+
+- name: Add a new Guacamole user
+  scicore.guacamole.guacamole_user:
+    base_url: "http://{{ tf.edge_public_ip.value }}"
+    auth_username: "{{ auth_username }}"
+    auth_password: "{{ auth_password }}"
+    username: "{{ user_username }}"
+    password: "{{ user_password }}"
+    full_name: "{{ user_full_name }}"
+    email: "{{ user_email }}"
+    organization: "{{ user_organization }}"
+    allowed_connections: "{{ user_allowed_connections }}"
+  register: _user_info
+
+- name: Debug user info
+  debug:
+    var: _user_info

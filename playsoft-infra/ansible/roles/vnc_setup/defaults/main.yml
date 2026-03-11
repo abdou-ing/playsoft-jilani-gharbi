@@ -1,0 +1,10 @@
+---
+# VNC port scan range
+start_vnc_port: 1
+max_vnc_port: 99
+
+# Proxmox node name
+node_name: playsoft-proxmox
+
+# Path to the Terraform output JSON
+tf_output_path: "~/playsoft-jilani-gharbi/playsoft-infra/terraform/modules/vnc-server/tf_output.json"

@@ -1,0 +1,32 @@
+---
+######################################################################
+# Generate a Guacamole direct-access URL for the created user
+######################################################################
+
+- name: Load Terraform output (edge public IP)
+  set_fact:
+    tf: "{{ lookup('file', tf_output_path_root) | from_json }}"
+
+- name: Derive Guacamole base URL from Terraform output
+  set_fact:
+    guac_base_url: "http://{{ tf.edge_public_ip.value }}"
+
+- name: Fetch Guacamole auth token for user
+  ansible.builtin.uri:
+    url: "{{ guac_base_url }}/api/tokens"
+    method: POST
+    body: "username={{ guac_token_username }}&password={{ guac_token_password }}"
+    body_format: form-urlencoded
+    return_content: true
+    status_code: 200
+  register: guac_token_response
+  no_log: true  # hide credentials from output
+
+- name: Extract auth token
+  set_fact:
+    guac_auth_token: "{{ guac_token_response.json.authToken }}"
+  no_log: true
+
+- name: Print direct Guacamole connection URL
+  debug:
+    msg: "🔗 Direct Guacamole URL for '{{ guac_token_username }}': {{ guac_base_url }}/#/?token={{ guac_auth_token }}"

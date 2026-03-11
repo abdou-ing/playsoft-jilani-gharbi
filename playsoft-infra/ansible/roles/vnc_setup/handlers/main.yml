@@ -1,0 +1,3 @@
+---
+- name: restart_vm
+  command: /bin/bash -c "qm stop {{ vmid }} && qm start {{ vmid }}"

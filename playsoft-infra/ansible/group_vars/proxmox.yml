@@ -1,0 +1,7 @@
+---
+# Variables for the [proxmox] group
+start_vnc_port: 1
+max_vnc_port: 99
+node_name: playsoft-proxmox
+tf_output_path: "~/playsoft-jilani-gharbi/playsoft-infra/terraform/modules/vnc-server/tf_output.json"
+  
