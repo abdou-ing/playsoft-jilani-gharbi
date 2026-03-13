@@ -1,4 +1,4 @@
-output "vm_id" {
-  value = var.vm_id
+output "vm_ids" {
+  value = module.vm1[*].vm_id
 }
 

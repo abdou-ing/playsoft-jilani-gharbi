@@ -1,91 +1,36 @@
 ---
-######################################################################
-# 0) Load Terraform output and derive VM variables
-######################################################################
 - name: Load Terraform output
   set_fact:
     tf: "{{ lookup('file', tf_output_path) | from_json }}"
 
-- name: Derive vmid from Terraform output
+- name: Derive VM IDs from Terraform output
   set_fact:
-    vmid: "{{ tf.vm_id.value }}"
-    vm_conf_path: "/etc/pve/nodes/{{ node_name }}/qemu-server/{{ tf.vm_id.value }}.conf"
+    vm_ids_list: "{{ tf.vm_ids.value }}"
 
 - name: Show starting parameters
   debug:
     msg:
-      - "VMID          : {{ vmid }}"
+      - "VM IDs        : {{ vm_ids_list }}"
       - "Start display : {{ start_vnc_port }}"
       - "Max display   : {{ max_vnc_port }}"
       - "Node          : {{ node_name }}"
-  changed_when: false
 
-######################################################################
-# 1) AUTO-DISCOVER FIRST FREE DISPLAY
-######################################################################
 - name: Copy VNC port scan script to Proxmox
   copy:
     src: find_free_vnc.sh
     dest: /usr/local/bin/find_free_vnc.sh
     mode: "0755"
 
-- name: Find first free VNC display
-  command: "/usr/local/bin/find_free_vnc.sh {{ start_vnc_port }} {{ max_vnc_port }}"
-  register: vnc_scan
-  changed_when: false
-  failed_when: vnc_scan.rc not in [0]
+- name: Run VNC setup for each VM
+  include_tasks: configure_vnc.yml
+  loop: "{{ vm_ids_list }}"
+  loop_control:
+    loop_var: current_vmid
+    index_var: vm_loop_index
 
-- name: Fail if no free VNC display found in the specified range
-  fail:
-    msg: "No free VNC display found between :{{ start_vnc_port }} and :{{ max_vnc_port }} (ports 5900+N)."
-  when: (vnc_scan.stdout | trim) == ""
-
-- name: Set chosen VNC display + TCP port
-  set_fact:
-    vnc_port: "{{ vnc_scan.stdout | trim | int }}"
-    firewall_port: "{{ 5900 + (vnc_scan.stdout | trim | int) }}"
-  changed_when: false
-
-- name: Display chosen free VNC port
-  debug:
-    msg: "Using free VNC display :{{ vnc_port }} (TCP {{ firewall_port }})"
-  changed_when: false
-
-######################################################################
-# 2) APPLY VNC CONFIG TO THIS VM
-######################################################################
-- name: Apply VNC args on VM
-  command: >
-    qm set {{ vmid }} -args "-vnc 0.0.0.0:{{ vnc_port }}"
-  notify: restart_vm
-
-######################################################################
-# 3) FIREWALL RULE FOR VNC PORT
-######################################################################
-- name: Allow VNC port through firewall (idempotent)
-  ansible.builtin.iptables:
-    chain: INPUT
-    protocol: tcp
-    destination_port: "{{ firewall_port }}"
-    jump: ACCEPT
-    state: present
-    ip_version: ipv4
-  become: true
-  notify: restart_vm
-
-######################################################################
-# 4) RESTART VM IF ANY CHANGE OCCURRED
-######################################################################
 - name: Apply pending handlers (stop/start VM)
   meta: flush_handlers
 
-######################################################################
-# 5) SUMMARY
-######################################################################
 - name: Summary
   debug:
-    msg:
-      - "Final VNC display: :{{ vnc_port }}"
-      - "Final TCP port   : {{ firewall_port }}"
-      - "VM restarted only if config or firewall changed."
-  changed_when: false
+    msg: "VNC setup completed for VMs: {{ vm_ids_list }}"

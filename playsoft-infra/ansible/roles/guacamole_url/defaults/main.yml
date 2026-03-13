@@ -2,7 +2,10 @@
 # Path to root Terraform output JSON (contains edge_public_ip)
 tf_output_path_root: "~/playsoft-jilani-gharbi/playsoft-infra/terraform/tf_output.json"
 
-# Guacamole user credentials to generate the token
-# These default to the same vars as guacamole_connection role (user_username / user_password)
-guac_token_username: "{{ user_username }}"
-guac_token_password: "{{ user_password }}"
+# Path to Proxmox Terraform output JSON (contains vm_ids)
+tf_output_path_proxmox: "~/playsoft-jilani-gharbi/playsoft-infra/terraform/modules/vnc-server/tf_output.json"
+
+# Template config — same defaults as guacamole_connection role
+user_prefix: "candidat"
+user_password_prefix: "candidat"
+guacamole_users: []

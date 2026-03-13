@@ -1,32 +1,43 @@
 ---
 ######################################################################
-# Generate a Guacamole direct-access URL for the created user
+# Generate a Guacamole direct-access URL for each user
+# Users are derived from the same Proxmox vm_ids Terraform output
 ######################################################################
 
-- name: Load Terraform output (edge public IP)
+- name: Load root Terraform output (edge public IP)
   set_fact:
     tf: "{{ lookup('file', tf_output_path_root) | from_json }}"
 
-- name: Derive Guacamole base URL from Terraform output
+- name: Load Proxmox Terraform output (VM IDs)
+  set_fact:
+    tf_proxmox: "{{ lookup('file', tf_output_path_proxmox) | from_json }}"
+
+- name: Derive VM list
+  set_fact:
+    vm_ids_list: "{{ tf_proxmox.vm_ids.value }}"
+
+- name: Derive Guacamole base URL
   set_fact:
     guac_base_url: "http://{{ tf.edge_public_ip.value }}"
 
-- name: Fetch Guacamole auth token for user
-  ansible.builtin.uri:
-    url: "{{ guac_base_url }}/api/tokens"
-    method: POST
-    body: "username={{ guac_token_username }}&password={{ guac_token_password }}"
-    body_format: form-urlencoded
-    return_content: true
-    status_code: 200
-  register: guac_token_response
-  no_log: true  # hide credentials from output
-
-- name: Extract auth token
+# ─── Rebuild guacamole_users (same logic as guacamole_connection) ──
+- name: Build guacamole_users list from VM count
   set_fact:
-    guac_auth_token: "{{ guac_token_response.json.authToken }}"
-  no_log: true
+    guacamole_users: >-
+      {{
+        guacamole_users | default([]) + [{
+          'username': user_prefix ~ (idx + 1),
+          'password': user_password_prefix ~ (idx + 1)
+        }]
+      }}
+  loop: "{{ vm_ids_list }}"
+  loop_control:
+    index_var: idx
+    label: "VM {{ item }} → {{ user_prefix }}{{ idx + 1 }}"
 
-- name: Print direct Guacamole connection URL
-  debug:
-    msg: "🔗 Direct Guacamole URL for '{{ guac_token_username }}': {{ guac_base_url }}/#/?token={{ guac_auth_token }}"
+- name: Fetch token and print URL for each user
+  include_tasks: per_user_url.yml
+  loop: "{{ guacamole_users }}"
+  loop_control:
+    loop_var: guac_user
+    label: "{{ guac_user.username }}"
