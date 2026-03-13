@@ -1,36 +1,96 @@
 ---
-- name: Load Terraform output (edge public IP)
+- name: Load root Terraform output (edge public IP)
   set_fact:
     tf: "{{ lookup('file', tf_output_path_root) | from_json }}"
 
-- name: Add a new VNC connection in Guacamole
+- name: Load Proxmox Terraform output (VM IDs)
+  set_fact:
+    tf_proxmox: "{{ lookup('file', tf_output_path_proxmox) | from_json }}"
+
+- name: Derive VM list
+  set_fact:
+    vm_ids_list: "{{ tf_proxmox.vm_ids.value }}"
+
+- name: Show detected VMs and their assigned VNC ports
+  debug:
+    msg: |
+      🖥️  Detected {{ vm_ids_list | length }} VM(s):
+      {% for i in range(vm_ids_list | length) %}
+        • VM {{ vm_ids_list[i] }} → TCP {{ vnc_base_port + i }}
+      {% endfor %}
+
+# ─── Dynamically build guacamole_users from vm_ids + deterministic ports ──
+- name: Build guacamole_users list (VM ID → user → VNC port)
+  set_fact:
+    guacamole_users: >-
+      {{
+        guacamole_users | default([]) + [{
+          'username':            user_prefix ~ (idx + 1),
+          'password':            user_password_prefix ~ (idx + 1),
+          'full_name':           'User ' ~ (idx + 1),
+          'email':               user_prefix ~ (idx + 1) ~ '@' ~ user_email_domain,
+          'organization':        user_organization,
+          'connection_name':     connection_prefix ~ '-' ~ (idx + 1),
+          'protocol':            'vnc',
+          'hostname':            vnc_hostname,
+          'vnc_port':            vnc_base_port + idx,
+          'allowed_connections': [connection_prefix ~ '-' ~ (idx + 1)]
+        }]
+      }}
+  loop: "{{ vm_ids_list }}"
+  loop_control:
+    index_var: idx
+    label: "VM {{ item }} → {{ user_prefix }}{{ idx + 1 }} (port {{ vnc_base_port + idx }})"
+
+- name: Show generated users
+  debug:
+    msg: |
+      👥 {{ guacamole_users | length }} user(s) will be provisioned:
+      {% for u in guacamole_users %}
+        • {{ u.username }} → connection '{{ u.connection_name }}' @ {{ u.hostname }}:{{ u.vnc_port }}
+      {% endfor %}
+
+# ─── VNC connections ─────────────────────────────────────────────────
+- name: Add VNC connection for each user
   scicore.guacamole.guacamole_connection:
     base_url: "http://{{ tf.edge_public_ip.value }}"
     auth_username: "{{ auth_username }}"
     auth_password: "{{ auth_password }}"
-    connection_name: "{{ connection_name }}"
-    protocol: "{{ protocol }}"
-    hostname: "{{ hostname }}"
-    port: "{{ vnc_connection_port }}"
-  register: _connection_info
+    connection_name: "{{ item.connection_name }}"
+    protocol: "{{ item.protocol }}"
+    hostname: "{{ item.hostname }}"
+    port: "{{ item.vnc_port }}"
+    max_connections: "4"
+  loop: "{{ guacamole_users }}"
+  loop_control:
+    label: "{{ item.username }} → {{ item.connection_name }} (port {{ item.vnc_port }})"
+  register: _connections
 
-- name: Debug connection info
-  debug:
-    var: _connection_info
-
-- name: Add a new Guacamole user
+# ─── Guacamole user accounts ─────────────────────────────────────────
+- name: Add Guacamole user for each entry
   scicore.guacamole.guacamole_user:
     base_url: "http://{{ tf.edge_public_ip.value }}"
     auth_username: "{{ auth_username }}"
     auth_password: "{{ auth_password }}"
-    username: "{{ user_username }}"
-    password: "{{ user_password }}"
-    full_name: "{{ user_full_name }}"
-    email: "{{ user_email }}"
-    organization: "{{ user_organization }}"
-    allowed_connections: "{{ user_allowed_connections }}"
-  register: _user_info
+    username: "{{ item.username }}"
+    password: "{{ item.password }}"
+    full_name: "{{ item.full_name }}"
+    email: "{{ item.email }}"
+    organization: "{{ item.organization }}"
+    allowed_connections: "{{ item.allowed_connections }}"
+  loop: "{{ guacamole_users }}"
+  loop_control:
+    label: "{{ item.username }}"
+  register: _users
+  no_log: true
 
-- name: Debug user info
+- name: Summary
   debug:
-    var: _user_info
+    msg: |
+      ✅ Provisioning complete:
+        • VMs detected    : {{ vm_ids_list | length }} (IDs: {{ vm_ids_list | join(', ') }})
+        • Users created   : {{ _users.results | selectattr('changed') | list | length }} new, {{ _users.results | rejectattr('changed') | list | length }} already existed
+        • VNC connections : {{ _connections.results | selectattr('changed') | list | length }} new, {{ _connections.results | rejectattr('changed') | list | length }} already existed
+      {% for i in range(guacamole_users | length) %}
+        • VM {{ vm_ids_list[i] }} → {{ guacamole_users[i].username }} → {{ guacamole_users[i].connection_name }} @ {{ guacamole_users[i].hostname }}:{{ guacamole_users[i].vnc_port }}
+      {% endfor %}
