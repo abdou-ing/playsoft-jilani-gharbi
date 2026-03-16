@@ -8,3 +8,8 @@ variable "vm_id" {
   type = number
   default = 201
 }
+
+variable "server_count" {
+  type    = number
+  default = 3
+}
