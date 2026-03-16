@@ -1,0 +1,17 @@
+---
+# Fetches a Guacamole auth token for the user and prints the direct URL.
+
+- name: "Fetch Guacamole auth token for '{{ guac_user.username }}'"
+  ansible.builtin.uri:
+    url: "{{ guac_base_url }}/api/tokens"
+    method: POST
+    body: "username={{ guac_user.username }}&password={{ guac_user.password }}"
+    body_format: form-urlencoded
+    return_content: true
+    status_code: 200
+  register: _guac_token_resp
+  no_log: true
+
+- name: "Print direct Guacamole URL for '{{ guac_user.username }}'"
+  debug:
+    msg: "🔗 Direct Guacamole URL for '{{ guac_user.username }}': {{ guac_base_url }}/#/?token={{ _guac_token_resp.json.authToken }}"
