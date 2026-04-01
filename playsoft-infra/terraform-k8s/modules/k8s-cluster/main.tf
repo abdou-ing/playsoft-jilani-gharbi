@@ -1,23 +1,3 @@
-terraform {
-  required_providers {
-    hcloud = {
-      source  = "hetznercloud/hcloud"
-      version = "~> 1.59.0"
-    }
-  }
-}
-
-# Image retrieval
-data "hcloud_image" "master_snapshot" {
-  with_selector = var.role_master_selector
-  most_recent   = true
-}
-
-data "hcloud_image" "worker_snapshot" {
-  with_selector = var.role_worker_selector
-  most_recent   = true
-}
-
 # Master Server
 resource "hcloud_server" "master" {
   name        = "hzn-k8s-master-jilani"

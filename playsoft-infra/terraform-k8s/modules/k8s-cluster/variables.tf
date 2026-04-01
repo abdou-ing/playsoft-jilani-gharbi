@@ -38,7 +38,7 @@ variable "worker_base_offset" {
 
 variable "role_master_selector" {
   type    = string
-  default = "role=k8s_master,created_by=jilani"
+  default = "role=k8s_master_and_worker,created_by=jilani"
 }
 
 variable "role_worker_selector" {

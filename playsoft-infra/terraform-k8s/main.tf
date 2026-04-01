@@ -1,20 +1,3 @@
-terraform {
-  required_providers {
-    hcloud = {
-      source  = "hetznercloud/hcloud"
-      version = "~> 1.59.0"
-    }
-  }
-}
-
-provider "hcloud" {
-  # token = var.hcloud_token
-}
-
-data "hcloud_network" "main" {
-  name = "nw-jilani" 
-}
-
 module "k8s_cluster" {
   source = "./modules/k8s-cluster"
 
