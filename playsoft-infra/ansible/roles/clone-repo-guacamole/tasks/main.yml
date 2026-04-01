@@ -1,0 +1,23 @@
+---
+- name: Ensure /opt directory exists
+  file:
+    path: /opt
+    state: directory
+    mode: '0755'
+
+- name: Clone guacamole repository
+  git:
+    repo: "https://github.com/abdou-ing/playsoft-jilani-gharbi.git"
+    dest: "/opt/playsoft-jilani-gharbi"
+    version: "feature/terraform"
+    force: yes
+
+- name: Apply Guacamole Kubernetes manifests
+  command: >
+    kubectl apply
+    -n guacamole
+    -f /opt/playsoft-jilani-gharbi/guacamole-manifest
+  register: kubectl_apply
+
+- debug:
+    var: kubectl_apply.stdout_lines
