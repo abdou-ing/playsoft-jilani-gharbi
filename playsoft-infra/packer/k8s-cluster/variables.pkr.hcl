@@ -18,28 +18,17 @@ variable "image" {
   default = "ubuntu-24.04"
 }
 
-variable "snapshot_name_master" {
+variable "snapshot_name" {
   type    = string
-  default = "k8s-master-{{timestamp}}"
+  default = "hzn-jilani-k8s-1.29-containerd-node-v1-{{timestamp}}"
 }
 
-variable "snapshot_name_worker" {
-  type    = string
-  default = "k8s-worker-{{timestamp}}"
-}
 
-variable "snapshot_labels_master" {
+
+variable "snapshot_labels" {
   type    = map(string)
   default = {
-    "role"       = "k8s_master"
-    "created_by" = "jilani"
-  }
-}
-
-variable "snapshot_labels_worker" {
-  type    = map(string)
-  default = {
-    "role"       = "k8s_worker"
+    "role"       = "k8s_master_and_worker"
     "created_by" = "jilani"
   }
 }
