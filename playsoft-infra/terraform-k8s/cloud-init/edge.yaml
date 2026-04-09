@@ -37,7 +37,7 @@ write_files:
         return 302 "http://guacamole.playsoft.io/#/?token=C6F220976578A083CD25E3121111045D90598B323878F1F26EC176E7A88AD70D";
         }
         
-        location / {
+        location /guacamole/ {
           proxy_pass http://10.20.0.10:30080/guacamole/;
           proxy_http_version 1.1;
 

@@ -20,7 +20,7 @@ variable "image" {
 
 variable "snapshot_name" {
   type    = string
-  default = "hzn-jilani-k8s-1.29-containerd-node-v1-{{timestamp}}"
+  default = "hzn-jilani-k8s-v135-containerd-node-v1-{{timestamp}}"
 }
 
 

@@ -10,15 +10,14 @@ apt-get update
 apt-get install -y apt-transport-https ca-certificates curl gnupg
 
 echo "[INFO] Add Kubernetes repository"
-curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key \
-  | gpg --dearmor -o /etc/apt/trusted.gpg.d/kubernetes.gpg
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg # allow unprivileged APT programs to read this keyring
 
-echo "deb [signed-by=/etc/apt/trusted.gpg.d/kubernetes.gpg] \
-https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /" \
-> /etc/apt/sources.list.d/kubernetes.list
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.35/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list   # helps tools such as command-not-found to work correctly
 
 echo "[INFO] Install containerd + Kubernetes tools"
-apt-get update
+sudo apt-get update
 apt-get install -y containerd kubelet kubeadm kubectl
 apt-mark hold kubelet kubeadm kubectl
 
@@ -51,9 +50,9 @@ sysctl --system
 
 echo "[INFO] Enable & restart kubelet"
 systemctl enable kubelet
-systemctl restart kubelet
+# systemctl restart kubelet
 
 echo "[INFO] Verify containerd config"
-grep SystemdCgroup /etc/containerd/config.toml
+grep SystemdCgroup /etc/containerd/config.toml | tee -a /tmp/containerd_config_check.log
 
 echo "[INFO] Kubernetes node is READY for cluster initialization"

@@ -33,3 +33,29 @@ variable "edge_private_ip" {
   type        = string
   default     = "10.20.0.2"
 }
+
+variable "vnc_server_count" {
+  description = "Number of VNC servers"
+  type        = number
+}
+
+variable "proxmox_api_url" {
+  type = string
+}
+
+variable "proxmox_api_token_id" {
+  type = string
+}
+
+variable "proxmox_api_token_secret" {
+  type      = string
+  sensitive = true
+}
+
+variable "node_name" {
+  type    = string
+}
+
+variable "template_id" {
+  type    = number
+}

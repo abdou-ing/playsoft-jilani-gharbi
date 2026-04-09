@@ -1,10 +1,4 @@
-# Image retrieval
-data "hcloud_image" "master_snapshot" {
-  with_selector = var.role_master_selector
-  most_recent   = true
-}
-
-data "hcloud_image" "worker_snapshot" {
-  with_selector = var.role_worker_selector
+data "hcloud_image" "k8s_snapshot" {
+  with_selector = "created_by=jilani,role=k8s_master_and_worker"
   most_recent   = true
 }

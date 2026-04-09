@@ -9,3 +9,7 @@ output "k8s_worker_private_ips" {
 output "bastion_public_ip" {
   value = module.edge.public_ip
 }
+
+output "vnc_vm_ids" {
+  value = module.vnc_server[*].vm_ids
+}

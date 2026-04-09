@@ -1,12 +1,3 @@
-terraform {
-  required_providers {
-    hcloud = {
-      source  = "hetznercloud/hcloud"
-      version = "~> 1.59.0"
-    }
-  }
-}
-
 resource "hcloud_server" "edge" {
   name        = "hzn-bastion-jilani"
   image       = data.hcloud_image.bastion_snapshot.id
@@ -25,12 +16,8 @@ resource "hcloud_server" "edge" {
   network {
     network_id = var.network_id
     ip         = var.edge_private_ip
+    alias_ips = []
   }
-}
-
-data "hcloud_image" "bastion_snapshot" {
-  with_selector = "created_by=jilani,role=bastion"
-  most_recent   = true
 }
 
 # Firewall

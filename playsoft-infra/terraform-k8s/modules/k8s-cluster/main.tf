@@ -1,7 +1,7 @@
 # Master Server
 resource "hcloud_server" "master" {
   name        = "hzn-k8s-master-jilani"
-  image       = data.hcloud_image.master_snapshot.id
+  image       = data.hcloud_image.k8s_snapshot.id
   server_type = var.server_type
   location    = var.location
   ssh_keys    = [var.ssh_key_name]
@@ -14,6 +14,8 @@ resource "hcloud_server" "master" {
   network {
     network_id = var.network_id
     ip         = var.master_private_ip
+    alias_ips = []
+
   }
 
   user_data = file("${path.module}/../../cloud-init/master.yaml")
@@ -28,7 +30,7 @@ resource "hcloud_server" "master" {
 resource "hcloud_server" "worker" {
   count       = var.worker_count
   name        = "hzn-k8s-worker-${count.index + 1}-jilani"
-  image       = data.hcloud_image.worker_snapshot.id
+  image       = data.hcloud_image.k8s_snapshot.id
   server_type = var.server_type
   location    = var.location
   ssh_keys    = [var.ssh_key_name]
