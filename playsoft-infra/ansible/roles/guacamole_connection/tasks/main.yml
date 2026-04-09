@@ -1,22 +1,18 @@
 ---
-- name: Load root Terraform output (edge public IP)
+- name: Load Terraform output (terraform-k8s)
   set_fact:
     tf: "{{ lookup('file', tf_output_path_root) | from_json }}"
 
-- name: Load Proxmox Terraform output (VM IDs)
-  set_fact:
-    tf_proxmox: "{{ lookup('file', tf_output_path_proxmox) | from_json }}"
-
 - name: Derive VM list
   set_fact:
-    vm_ids_list: "{{ tf_proxmox.vm_ids.value }}"
+    vm_ids_list: "{{ tf.vnc_vm_ids.value | flatten }}"
 
 - name: Show detected VMs and their assigned VNC ports
   debug:
     msg: |
       🖥️  Detected {{ vm_ids_list | length }} VM(s):
       {% for i in range(vm_ids_list | length) %}
-        • VM {{ vm_ids_list[i] }} → TCP {{ vnc_base_port + i }}
+        • VM {{ vm_ids_list[i] }} → TCP {{ 5900 + (vm_ids_list[i] | int - 200) }}
       {% endfor %}
 
 # ─── Dynamically build guacamole_users from vm_ids + deterministic ports ──
@@ -33,7 +29,7 @@
           'connection_name':     connection_prefix ~ '-' ~ (idx + 1),
           'protocol':            'vnc',
           'hostname':            vnc_hostname,
-          'vnc_port':            vnc_base_port + idx,
+          'vnc_port':            5900 + (item | int - 200),
           'allowed_connections': [connection_prefix ~ '-' ~ (idx + 1)]
         }]
       }}
@@ -53,7 +49,7 @@
 # ─── VNC connections ─────────────────────────────────────────────────
 - name: Add VNC connection for each user
   scicore.guacamole.guacamole_connection:
-    base_url: "http://{{ tf.edge_public_ip.value }}"
+    base_url: "http://{{ tf.bastion_public_ip.value }}/guacamole/"
     auth_username: "{{ auth_username }}"
     auth_password: "{{ auth_password }}"
     connection_name: "{{ item.connection_name }}"
@@ -69,7 +65,7 @@
 # ─── Guacamole user accounts ─────────────────────────────────────────
 - name: Add Guacamole user for each entry
   scicore.guacamole.guacamole_user:
-    base_url: "http://{{ tf.edge_public_ip.value }}"
+    base_url: "http://{{ tf.bastion_public_ip.value }}/guacamole/"
     auth_username: "{{ auth_username }}"
     auth_password: "{{ auth_password }}"
     username: "{{ item.username }}"

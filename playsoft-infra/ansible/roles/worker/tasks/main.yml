@@ -1,2 +1,4 @@
 - name: Join Kubernetes cluster
   command: "{{ hostvars[groups['masters'][0]].kube_join_command }}"
+  args:
+    creates: /etc/kubernetes/kubelet.conf

@@ -5,7 +5,7 @@
 
 - name: Derive VM IDs from Terraform output
   set_fact:
-    vm_ids_list: "{{ tf.vm_ids.value }}"
+    vm_ids_list: "{{ tf.vnc_vm_ids.value | flatten }}"
 
 - name: Show starting parameters
   debug:
