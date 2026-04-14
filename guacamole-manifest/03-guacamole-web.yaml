@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
       - name: guacamole-web
-        image: jilanigh/custom-guac-ui:1.10
+        image: jilanigh/guacamole:custom-v1.10
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
