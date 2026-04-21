@@ -45,15 +45,23 @@
         seconds: 120
 
 # ---------------------------------------------------------------------------
-# 1. Proxmox: Configure VNC access on the VM
+# 1. Proxmox: Configure Access on the VM
 # ---------------------------------------------------------------------------
-- name: Configure VNC on Proxmox
+- name: Configure Access on Proxmox
   hosts: proxmox
   become: true
   gather_facts: true
-  tags: [vnc_setup]
-  roles:
-    - vnc_setup
+  tags: [access_setup]
+  tasks:
+    - name: Configure VNC
+      ansible.builtin.include_role:
+        name: vnc_setup
+      when: "'vnc' in connection_type"
+
+    - name: Configure SSH
+      ansible.builtin.include_role:
+        name: ssh_setup
+      when: "'ssh' in connection_type"
 
 # ---------------------------------------------------------------------------
 # 4. Localhost: Register Guacamole connection + user via API
@@ -68,11 +76,17 @@
 # ---------------------------------------------------------------------------
 # 5. Localhost: Generate and print the direct Guacamole access URL
 # ---------------------------------------------------------------------------
-- name: Print direct Guacamole access URL
+- name: Print detailed Guacamole access information
   hosts: localhost
   become: false
   tags: [guacamole_url]
-  roles:
-    - guacamole_url
+  tasks:
+    - name: Run token-url script
+      ansible.builtin.shell: "/home/jilani/playsoft-jilani-gharbi/playsoft-infra/scripts/token-url.sh"
+      register: token_url_output
+
+    - name: Display connection details
+      debug:
+        msg: "{{ token_url_output.stdout_lines }}"
 
 

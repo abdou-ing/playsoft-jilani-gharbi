@@ -16,4 +16,3 @@
 - name: "Print direct Guacamole URL for '{{ guac_user.username }}'"
   debug:
     msg: "🔗 Direct Guacamole URL for '{{ guac_user.username }}': {{ guac_base_url }}#/?token={{ _guac_token_resp.json.authToken }}"
-

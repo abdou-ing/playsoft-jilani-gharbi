@@ -1,0 +1,62 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: guacamole-init-db
+  namespace: guacamole
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      volumes:
+      - name: init-script
+        emptyDir: {}
+
+      initContainers:
+      - name: generate-sql
+        image: guacamole/guacamole
+        command: ["/bin/bash", "-c"]
+        args:
+          - >
+            /opt/guacamole/bin/initdb.sh --postgresql > /tmp/shared/initdb.sql
+        volumeMounts:
+        - name: init-script
+          mountPath: /tmp/shared
+
+      - name: wait-for-postgres
+        image: postgres:15.3
+        command: ["/bin/bash", "-c"]
+        args:
+          - >
+            until pg_isready -h postgres -p 5432; do
+              echo "Waiting for postgres...";
+              sleep 3;
+            done
+
+      containers:
+      - name: init-db
+        image: postgres:15.3
+        command: ["/bin/bash", "-c"]
+        args:
+          - >
+            PGPASSWORD=$POSTGRES_PASSWORD
+            psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB
+            -f /tmp/shared/initdb.sql
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: postgres-password
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: postgres-db
+        volumeMounts:
+        - name: init-script
+          mountPath: /tmp/shared

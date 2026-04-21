@@ -7,60 +7,113 @@
   set_fact:
     vm_ids_list: "{{ tf.vnc_vm_ids.value | flatten }}"
 
-- name: Show detected VMs and their assigned VNC ports
-  debug:
-    msg: |
-      🖥️  Detected {{ vm_ids_list | length }} VM(s):
-      {% for i in range(vm_ids_list | length) %}
-        • VM {{ vm_ids_list[i] }} → TCP {{ 5900 + (vm_ids_list[i] | int - 200) }}
-      {% endfor %}
-
-# ─── Dynamically build guacamole_users from vm_ids + deterministic ports ──
-- name: Build guacamole_users list (VM ID → user → VNC port)
+- name: Initialize empty lists
   set_fact:
-    guacamole_users: >-
+    guac_connections: []
+    guacamole_users: []
+
+# ─── Dynamically build guacamole_connections list ──
+- name: Build VNC connections list
+  set_fact:
+    guac_vnc_connections: >-
       {{
-        guacamole_users | default([]) + [{
-          'username':            user_prefix ~ (idx + 1),
-          'password':            user_password_prefix ~ (idx + 1),
-          'full_name':           'User ' ~ (idx + 1),
-          'email':               user_prefix ~ (idx + 1) ~ '@' ~ user_email_domain,
-          'organization':        user_organization,
-          'connection_name':     connection_prefix ~ '-' ~ (idx + 1),
-          'protocol':            'vnc',
-          'hostname':            vnc_hostname,
-          'vnc_port':            5900 + (item | int - 200),
-          'allowed_connections': [connection_prefix ~ '-' ~ (idx + 1)]
+        guac_vnc_connections | default([]) + [{
+          'name': connection_prefix ~ '-' ~ (idx + 1) ~ '-vnc',
+          'protocol': 'vnc',
+          'hostname': vnc_hostname,
+          'port': (vnc_base_port | int + (item | int - 201)) | string,
+          'username_idx': idx
         }]
       }}
   loop: "{{ vm_ids_list }}"
   loop_control:
     index_var: idx
-    label: "VM {{ item }} → {{ user_prefix }}{{ idx + 1 }} (port {{ vnc_base_port + idx }})"
+  when: "'vnc' in connection_type"
+
+- name: Build SSH connections list
+  set_fact:
+    guac_ssh_connections: >-
+      {{
+        guac_ssh_connections | default([]) + [{
+          'name': connection_prefix ~ '-' ~ (idx + 1) ~ '-ssh',
+          'protocol': 'ssh',
+          'hostname': vnc_hostname,
+          'port': (2200 + (item | int - 200)) | string,
+          'username_idx': idx,
+          'parameters': {
+            'username': ssh_user,
+            'password': ssh_password
+          }
+        }]
+      }}
+  loop: "{{ vm_ids_list }}"
+  loop_control:
+    index_var: idx
+  when: "'ssh' in connection_type"
+
+# Merge for user assignment
+- name: Merge connections for user assignment
+  set_fact:
+    guac_connections: "{{ (guac_vnc_connections | default([])) + (guac_ssh_connections | default([])) }}"
+
+# ─── Dynamically build guacamole_users list ──
+- name: Build guacamole_users list
+  set_fact:
+    guacamole_users: >-
+      {{
+        guacamole_users + [{
+          'username':            user_prefix ~ (idx + 1),
+          'password':            user_password_prefix ~ (idx + 1),
+          'full_name':           'User ' ~ (idx + 1),
+          'email':               user_prefix ~ (idx + 1) ~ '@' ~ user_email_domain,
+          'organization':        user_organization,
+          'allowed_connections': guac_connections | selectattr('username_idx', 'equalto', idx) | map(attribute='name') | list
+        }]
+      }}
+  loop: "{{ vm_ids_list }}"
+  loop_control:
+    index_var: idx
 
 - name: Show generated users
   debug:
     msg: |
       👥 {{ guacamole_users | length }} user(s) will be provisioned:
       {% for u in guacamole_users %}
-        • {{ u.username }} → connection '{{ u.connection_name }}' @ {{ u.hostname }}:{{ u.vnc_port }}
+        • {{ u.username }} → connections: {{ u.allowed_connections | join(', ') }}
       {% endfor %}
 
-# ─── VNC connections ─────────────────────────────────────────────────
-- name: Add VNC connection for each user
+# ─── Create connections ─────────────────────────────────────────────────
+- name: Add Guacamole VNC connections
   scicore.guacamole.guacamole_connection:
     base_url: "http://{{ tf.bastion_public_ip.value }}/guacamole/"
     auth_username: "{{ auth_username }}"
     auth_password: "{{ auth_password }}"
-    connection_name: "{{ item.connection_name }}"
+    connection_name: "{{ item.name }}"
     protocol: "{{ item.protocol }}"
     hostname: "{{ item.hostname }}"
-    port: "{{ item.vnc_port }}"
+    port: "{{ item.port }}"
     max_connections: "4"
-  loop: "{{ guacamole_users }}"
+  loop: "{{ guac_vnc_connections | default([]) }}"
   loop_control:
-    label: "{{ item.username }} → {{ item.connection_name }} (port {{ item.vnc_port }})"
-  register: _connections
+    label: "{{ item.name }} (vnc://{{ item.hostname }}:{{ item.port }})"
+  register: _vnc_connections
+
+- name: Add Guacamole SSH connections (with auth)
+  scicore.guacamole.guacamole_connection:
+    base_url: "http://{{ tf.bastion_public_ip.value }}/guacamole/"
+    auth_username: "{{ auth_username }}"
+    auth_password: "{{ auth_password }}"
+    connection_name: "{{ item.name }}"
+    protocol: "{{ item.protocol }}"
+    hostname: "{{ item.hostname }}"
+    port: "{{ item.port }}"
+    username: "{{ item.parameters.username }}"
+    password: "{{ item.parameters.password }}"
+    max_connections: "4"
+  loop: "{{ guac_ssh_connections | default([]) }}"
+  loop_control:
+    label: "{{ item.name }} (ssh://{{ item.hostname }}:{{ item.port }})"
+  register: _ssh_connections
 
 # ─── Guacamole user accounts ─────────────────────────────────────────
 - name: Add Guacamole user for each entry
@@ -86,7 +139,4 @@
       ✅ Provisioning complete:
         • VMs detected    : {{ vm_ids_list | length }} (IDs: {{ vm_ids_list | join(', ') }})
         • Users created   : {{ _users.results | selectattr('changed') | list | length }} new, {{ _users.results | rejectattr('changed') | list | length }} already existed
-        • VNC connections : {{ _connections.results | selectattr('changed') | list | length }} new, {{ _connections.results | rejectattr('changed') | list | length }} already existed
-      {% for i in range(guacamole_users | length) %}
-        • VM {{ vm_ids_list[i] }} → {{ guacamole_users[i].username }} → {{ guacamole_users[i].connection_name }} @ {{ guacamole_users[i].hostname }}:{{ guacamole_users[i].vnc_port }}
-      {% endfor %}
+        • Connections     : {{ (_vnc_connections.results | default([]) + _ssh_connections.results | default([])) | selectattr('changed') | list | length }} new, {{ (_vnc_connections.results | default([]) + _ssh_connections.results | default([])) | rejectattr('changed') | list | length }} already existed

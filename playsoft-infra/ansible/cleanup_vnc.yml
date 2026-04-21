@@ -1,0 +1,29 @@
+---
+- name: Cleanup Proxmox Firewall
+  hosts: proxmox
+  become: true
+  tasks:
+    - name: Load Terraform output
+      set_fact:
+        tf: "{{ lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json') | from_json }}"
+
+    - name: Derive VM IDs
+      set_fact:
+        vm_ids_list: "{{ tf.vnc_vm_ids.value | flatten }}"
+
+    - name: Remove VNC args from VM config
+      command: "qm set {{ item | int }} --delete args"
+      loop: "{{ vm_ids_list }}"
+      ignore_errors: true
+      become: true
+
+    - name: Remove iptables rules for VNC
+      ansible.builtin.iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: "{{ vnc_base_port | int + (item | int - 201) }}"
+        jump: ACCEPT
+        state: absent
+        ip_version: ipv4
+      loop: "{{ vm_ids_list }}"
+      ignore_errors: true

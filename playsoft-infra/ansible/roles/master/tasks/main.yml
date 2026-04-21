@@ -26,3 +26,10 @@
 - name: Share join command with other hosts
   set_fact:
     kube_join_command: "{{ join_command.stdout }}"
+
+# - name: copy file
+#   copy:
+#     src: files/*
+#     dest: /opt/guacamole_manifest/
+#     mode: '0644'
+  
