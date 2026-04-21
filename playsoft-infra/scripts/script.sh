@@ -41,7 +41,7 @@ echo "🌍 Running Terraform for Hetzner servers..."
 
 cd ~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s
 
-terraform apply -var-file=env/dev.tfvars -auto-approve
+#terraform apply -var-file=env/dev.tfvars -auto-approve
 
 cd ~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s
 
@@ -57,7 +57,7 @@ echo "✅ Terraform apply completed."
 
 echo "🌍 Running Ansible playbook for full configuration..."
 cd ~/playsoft-jilani-gharbi/playsoft-infra/ansible
-ansible-playbook site.yml --tags "vnc_setup,guacamole_connection,guacamole_url"
+ansible-playbook site.yml --tags "access_setup,k8s_cluster,guacamole_connection,guacamole_url"
 
 
 
