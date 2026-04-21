@@ -13,3 +13,18 @@ output "bastion_public_ip" {
 output "vnc_vm_ids" {
   value = module.vnc_server[*].vm_ids
 }
+
+
+output "vm_ips" {
+  value = [for m in module.vnc_server : m.primary_ipv4_address]
+}
+
+
+
+
+
+
+
+
+
+

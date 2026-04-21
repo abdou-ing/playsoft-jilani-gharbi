@@ -4,7 +4,7 @@ resource "proxmox_virtual_environment_vm" "vm" {
   vm_id     = var.vm_id
 
   agent {
-    enabled = false
+    enabled = true
   }
 
   clone {
