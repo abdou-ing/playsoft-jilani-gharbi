@@ -14,9 +14,16 @@ output "vnc_vm_ids" {
   value = module.vnc_server[*].vm_ids
 }
 
+output "vnc_vm_ips" {
+  value = [for server in module.vnc_server : server.primary_ipv4_address]
+}
 
-output "vm_ips" {
-  value = [for m in module.vnc_server : m.primary_ipv4_address]
+output "windows_vm_ids" {
+  value = module.windows_vm.vm_ids
+}
+
+output "windows_vm_ips" {
+  value = module.windows_vm.primary_ipv4_addresses
 }
 
 

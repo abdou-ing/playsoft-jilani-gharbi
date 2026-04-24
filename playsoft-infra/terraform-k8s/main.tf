@@ -29,3 +29,12 @@ module "vnc_server" {
   template_id = var.template_id
 }
 
+module "windows_vm" {
+  source = "./modules/windows-vm"
+
+  node_name    = var.node_name
+  template_id  = var.windows_template_id
+  server_count = var.windows_server_count
+  vm_id        = 401
+}
+

@@ -59,3 +59,14 @@ variable "node_name" {
 variable "template_id" {
   type    = number
 }
+
+variable "windows_server_count" {
+  description = "Number of Windows servers"
+  type        = number
+  default     = 1
+}
+
+variable "windows_template_id" {
+  description = "Template ID for Windows VM"
+  type        = number
+}
