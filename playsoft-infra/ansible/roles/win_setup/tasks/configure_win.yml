@@ -1,0 +1,69 @@
+---
+- name: Set destination IP and RDP NAT port for Windows VM {{ windows_vm_ids_list[win_vm_idx] }}
+  set_fact:
+    current_win_vmid: "{{ windows_vm_ids_list[win_vm_idx] }}"
+    current_win_ip: "{{ windows_vm_ips_list[win_vm_idx] }}"
+    current_win_nat_port: "{{ win_rdp_base_port | int + win_vm_idx }}"
+
+- name: Display chosen RDP port for Windows VMID {{ current_win_vmid }}
+  debug:
+    msg: "Forwarding TCP {{ current_win_nat_port }} to Windows VM {{ current_win_vmid }} ({{ current_win_ip }}:3389)"
+
+- name: Configure Windows network profile and RDP firewall rules over Evil-WinRM
+  ansible.builtin.shell: >-
+    evil-winrm -i {{ current_win_ip | quote }} -u {{ win_user | quote }} -p {{ win_password | quote }}
+  args:
+    stdin: |
+      Write-Host "Current network profile:"
+      $profile = Get-NetConnectionProfile -InterfaceAlias "{{ win_network_interface_alias }}"
+      $profile | Format-Table -AutoSize
+
+      if ($profile.NetworkCategory -ne "Private") {
+        Set-NetConnectionProfile -InterfaceAlias "{{ win_network_interface_alias }}" -NetworkCategory Private
+        Write-Host "Network profile changed to Private"
+      } else {
+        Write-Host "Network profile already Private"
+      }
+
+      Write-Host "Remote Desktop firewall rules:"
+      Get-NetFirewallRule -DisplayGroup "Remote Desktop" | Select DisplayName, Enabled, Direction
+
+      if (-not (Get-NetFirewallRule -DisplayName "{{ win_firewall_rule_name }}" -ErrorAction SilentlyContinue)) {
+        New-NetFirewallRule -DisplayName "{{ win_firewall_rule_name }}" -Direction Inbound -Protocol TCP -LocalPort 3389 -Action Allow | Out-Null
+        Write-Host "Firewall rule created"
+      } else {
+        Write-Host "Firewall rule already exists"
+      }
+
+      Write-Host "RDP listeners:"
+      netstat -an | findstr :3389
+      exit
+  register: win_setup_result
+  retries: "{{ win_setup_retries }}"
+  delay: "{{ win_setup_delay }}"
+  until: win_setup_result.rc == 0
+  changed_when: >-
+    'Network profile changed to Private' in (win_setup_result.stdout | default(''))
+    or 'Firewall rule created' in (win_setup_result.stdout | default(''))
+  no_log: true
+
+- name: "NAT PREROUTING: Forward port {{ current_win_nat_port }} to {{ current_win_ip }}:3389"
+  ansible.builtin.iptables:
+    table: nat
+    chain: PREROUTING
+    protocol: tcp
+    destination_port: "{{ current_win_nat_port }}"
+    jump: DNAT
+    to_destination: "{{ current_win_ip }}:3389"
+    state: present
+    comment: "RDP NAT for Windows VM {{ current_win_vmid }}"
+
+- name: "Filter FORWARD: Accept traffic to {{ current_win_ip }}:3389"
+  ansible.builtin.iptables:
+    chain: FORWARD
+    protocol: tcp
+    destination: "{{ current_win_ip }}"
+    destination_port: "3389"
+    jump: ACCEPT
+    state: present
+    comment: "Allow RDP to Windows VM {{ current_win_vmid }}"

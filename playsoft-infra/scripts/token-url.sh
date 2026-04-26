@@ -29,9 +29,18 @@ USERNAME="${USER_PREFIX}1"
 PASSWORD="${USER_PASS_PREFIX}1"
 
 # Determine connection types from all.yml to avoid strict errors on disabled types
-CONN_TYPES=$(grep -A 5 "^connection_type:" "${ANSIBLE_VARS}" | grep -E "^\s*-\s*\"?(vnc|ssh)\"?" | sed 's/.*-\s*//' | tr -d '"' | tr -d "'")
+CONN_TYPES=$(grep -A 10 "^connection_type:" "${ANSIBLE_VARS}" | grep -E "^\s*-\s*\"?(vnc|ssh|win)\"?" | sed 's/.*-\s*//' | tr -d '"' | tr -d "'")
 IS_VNC=$(echo "${CONN_TYPES}" | grep -q "vnc" && echo "true" || echo "false")
 IS_SSH=$(echo "${CONN_TYPES}" | grep -q "ssh" && echo "true" || echo "false")
+IS_WIN=$(echo "${CONN_TYPES}" | grep -q "win" && echo "true" || echo "false")
+
+# Determine which VM families actually exist in Terraform output.
+VNC_VM_COUNT=$(jq -r '.vnc_vm_ids.value | length' "${TF_OUTPUT}")
+WIN_VM_COUNT=$(jq -r '.windows_vm_ids.value | length' "${TF_OUTPUT}")
+
+HAS_VNC=$( [ "${IS_VNC}" = "true" ] && [ "${VNC_VM_COUNT}" -gt 0 ] && echo "true" || echo "false" )
+HAS_SSH=$( [ "${IS_SSH}" = "true" ] && [ "${VNC_VM_COUNT}" -gt 0 ] && echo "true" || echo "false" )
+HAS_WIN=$( [ "${IS_WIN}" = "true" ] && [ "${WIN_VM_COUNT}" -gt 0 ] && echo "true" || echo "false" )
 
 # Step 1 — Get admin token to fetch connection IDs
 ADMIN_TOKEN=$(curl -s -X POST "${GUAC_URL}/api/tokens" \
@@ -46,33 +55,36 @@ fi
 # Step 2 — Dynamically find Connection IDs
 CONN_DATA=$(curl -s "${GUAC_URL}/api/session/data/postgresql/connections?token=${ADMIN_TOKEN}")
 
-CONN_ID_1=$(echo "${CONN_DATA}" | jq -r --arg name "${CONN_PREFIX}-1-vnc" 'to_entries[] | select(.value.name == $name) | .key')
-CONN_ID_2=$(echo "${CONN_DATA}" | jq -r --arg name "${CONN_PREFIX}-1-ssh" 'to_entries[] | select(.value.name == $name) | .key')
+declare -A CONN_IDS
+for TYPE in vnc ssh win; do
+  HAS_TYPE_VAR="HAS_$(echo "${TYPE}" | tr '[:lower:]' '[:upper:]')"
+  if [ "${!HAS_TYPE_VAR}" = "true" ]; then
+    CONN_IDS["${TYPE}"]=$(echo "${CONN_DATA}" | jq -r --arg name "${CONN_PREFIX}-1-${TYPE}" 'to_entries[] | select(.value.name == $name) | .key')
+  fi
+done
 
-echo "Detected Connection IDs: VNC=${CONN_ID_1}, SSH=${CONN_ID_2}"
+echo "Detected Connection IDs: VNC=${CONN_IDS[vnc]:-}, SSH=${CONN_IDS[ssh]:-}, WIN=${CONN_IDS[win]:-}"
 
-# Validation: Only fail if an ENABLED connection is missing its ID
-if [ "${IS_VNC}" = "true" ]; then
-    if [ -z "${CONN_ID_1}" ] || [ "${CONN_ID_1}" = "null" ]; then
-        echo "Error: Could not find connection ID for ${CONN_PREFIX}-1-vnc (VNC is enabled)"
-        exit 1
+# Validation: Only fail if an enabled connection type has real backing VMs and still
+# does not have a Guacamole connection.
+for TYPE in vnc ssh win; do
+  HAS_TYPE_VAR="HAS_$(echo "${TYPE}" | tr '[:lower:]' '[:upper:]')"
+  if [ "${!HAS_TYPE_VAR}" = "true" ]; then
+    if [ -z "${CONN_IDS[${TYPE}]}" ] || [ "${CONN_IDS[${TYPE}]}" = "null" ]; then
+      echo "Error: Could not find connection ID for ${CONN_PREFIX}-1-${TYPE} (${TYPE} is enabled)"
+      exit 1
     fi
-fi
-
-if [ "${IS_SSH}" = "true" ]; then
-    if [ -z "${CONN_ID_2}" ] || [ "${CONN_ID_2}" = "null" ]; then
-        echo "Error: Could not find connection ID for ${CONN_PREFIX}-1-ssh (SSH is enabled)"
-        exit 1
-    fi
-fi
+  fi
+done
 
 # Step 3 — Get candidate token
 TOKEN=$(curl -s -X POST "${GUAC_URL}/api/tokens" \
   -d "username=${USERNAME}&password=${PASSWORD}" \
   -H "Content-Type: application/x-www-form-urlencoded" | jq -r '.authToken')
- echo "Obtained token for ${USERNAME}: ${TOKEN}"
+echo "Obtained token for ${USERNAME}: ${TOKEN}"
 # Step 4 — Optional: Initialize tunnels
-for CID in "${CONN_ID_1}" "${CONN_ID_2}"; do
+for TYPE in vnc ssh win; do
+  CID="${CONN_IDS[${TYPE}]}"
   if [ ! -z "${CID}" ] && [ "${CID}" != "null" ]; then
     curl -s "${GUAC_URL}/api/tunnel?connect" \
       --data-urlencode "token=${TOKEN}" \
@@ -98,13 +110,24 @@ echo -e "\n------------------------------------------------"
 echo "Access Summary for ${USERNAME}:"
 echo "------------------------------------------------"
 
-if [ "${IS_VNC}" = "true" ] && [ "${IS_SSH}" = "true" ]; then
-  echo "Home page (Global): ${GUAC_URL}/?token=${TOKEN}#/"
-  echo "VNC Session:        ${GUAC_URL}/#/client/$(generate_client_id "${CONN_ID_1}")?token=${TOKEN}"
-  echo "SSH Session:        ${GUAC_URL}/#/client/$(generate_client_id "${CONN_ID_2}")?token=${TOKEN}"
-elif [ "${IS_VNC}" = "true" ]; then
-  echo "Direct VNC URL:     ${GUAC_URL}/#/client/$(generate_client_id "${CONN_ID_1}")?token=${TOKEN}"
-elif [ "${IS_SSH}" = "true" ]; then
-  echo "Direct SSH URL:     ${GUAC_URL}/#/client/$(generate_client_id "${CONN_ID_2}")?token=${TOKEN}"
+ENABLED_COUNT=0
+[ "${HAS_VNC}" = "true" ] && ENABLED_COUNT=$((ENABLED_COUNT + 1))
+[ "${HAS_SSH}" = "true" ] && ENABLED_COUNT=$((ENABLED_COUNT + 1))
+[ "${HAS_WIN}" = "true" ] && ENABLED_COUNT=$((ENABLED_COUNT + 1))
+
+if [ "${ENABLED_COUNT}" -eq 0 ]; then
+  echo "No Guacamole connections are available for the current Terraform output."
+  echo "Configured types: ${CONN_TYPES}"
+  echo "Terraform counts: vnc_vm_ids=${VNC_VM_COUNT}, windows_vm_ids=${WIN_VM_COUNT}"
+  echo "------------------------------------------------"
+  exit 0
 fi
+
+if [ "${ENABLED_COUNT}" -gt 1 ]; then
+  echo "Home page (Global): ${GUAC_URL}/?token=${TOKEN}#/"
+fi
+
+[ "${HAS_VNC}" = "true" ] && echo "VNC Session:        ${GUAC_URL}/#/client/$(generate_client_id "${CONN_IDS[vnc]}")?token=${TOKEN}"
+[ "${HAS_SSH}" = "true" ] && echo "SSH Session:        ${GUAC_URL}/#/client/$(generate_client_id "${CONN_IDS[ssh]}")?token=${TOKEN}"
+[ "${HAS_WIN}" = "true" ] && echo "RDP Session:        ${GUAC_URL}/#/client/$(generate_client_id "${CONN_IDS[win]}")?token=${TOKEN}"
 echo "------------------------------------------------"

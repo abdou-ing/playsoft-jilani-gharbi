@@ -21,7 +21,13 @@ user_email_domain: "example.com"
 connection_prefix: "exam"
 vnc_hostname: "138.201.200.168"
 vnc_base_port: 5910       # port = vnc_base_port + index (1-based)
+win_rdp_base_port: 3301   # port = win_rdp_base_port + index (0-based)
+
+
+win_user: "student"
+win_password: "123456"
 
 connection_type:
   - "vnc"
   - "ssh"
+  - "win"

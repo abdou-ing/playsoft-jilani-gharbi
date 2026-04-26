@@ -6,7 +6,7 @@
 - name: Derive VM IDs and IPs from Terraform output
   set_fact:
     vm_ids_list: "{{ tf.vnc_vm_ids.value | flatten }}"
-    vm_ips_list: "{{ tf.vm_ips.value | flatten }}"
+    vm_ips_list: "{{ tf.vnc_vm_ips.value | flatten }}"
 
 - name: Run SSH NAT setup for each VM
   include_tasks: configure_ssh.yml

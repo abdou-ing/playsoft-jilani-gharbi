@@ -3,7 +3,7 @@
 auth_username: "bob"
 auth_password: "bob"
 
-# Single Terraform output JSON (terraform-k8s — contains bastion_public_ip + vnc_vm_ids)
+# Single Terraform output JSON (terraform-k8s — contains bastion_public_ip + VM outputs)
 tf_output_path_root: "~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json"
 tf_output_path_proxmox: "~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json"
 
@@ -20,6 +20,10 @@ vnc_base_port: 5910
 ssh_user: "student"
 ssh_password: "Asd8=1HGge+r"
 
+# Windows / RDP connection authentication (parameters)
+win_user: "Administrator"
+win_password: "ChangeMe123!"
+win_rdp_base_port: 3301
+
 # Populated at runtime from vm_ids Terraform output
 guacamole_users: []
-

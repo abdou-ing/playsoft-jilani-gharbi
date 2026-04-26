@@ -63,6 +63,11 @@
         name: ssh_setup
       when: "'ssh' in connection_type"
 
+    - name: Configure Windows access
+      ansible.builtin.include_role:
+        name: win_setup
+      when: "'win' in connection_type"
+
 # ---------------------------------------------------------------------------
 # 4. Localhost: Register Guacamole connection + user via API
 # ---------------------------------------------------------------------------
@@ -88,5 +93,4 @@
     - name: Display connection details
       debug:
         msg: "{{ token_url_output.stdout_lines }}"
-
 
