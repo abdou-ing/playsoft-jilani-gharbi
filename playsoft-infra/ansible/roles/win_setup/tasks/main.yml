@@ -1,0 +1,28 @@
+---
+- name: Load Terraform output
+  set_fact:
+    tf: "{{ lookup('file', tf_output_path) | from_json }}"
+
+- name: Derive Windows VM IDs and IPs from Terraform output
+  set_fact:
+    windows_vm_ids_list: "{{ (tf.windows_vm_ids.value | flatten) if (tf.windows_vm_ids is defined and tf.windows_vm_ids.value is defined) else [] }}"
+    windows_vm_ips_list: "{{ (tf.windows_vm_ips.value | flatten) if (tf.windows_vm_ips is defined and tf.windows_vm_ips.value is defined) else [] }}"
+
+- name: Ensure evil-winrm is available on the Proxmox host
+  ansible.builtin.command: which evil-winrm
+  run_once: true
+  changed_when: false
+  when: windows_vm_ids_list | length > 0
+
+- name: Run Windows access setup for each VM
+  include_tasks: configure_win.yml
+  loop: "{{ range(0, windows_vm_ids_list | length) | list }}"
+  loop_control:
+    loop_var: win_vm_idx
+  when: windows_vm_ids_list | length > 0
+
+- name: Summary
+  debug:
+    msg: >-
+      Windows access setup completed for {{ windows_vm_ids_list | length }} VM(s)
+      {% if windows_vm_ids_list | length > 0 %}(IDs: {{ windows_vm_ids_list | join(', ') }}){% endif %}

@@ -1,34 +1,72 @@
 ---
 # ---------------------------------------------------------------------------
-# 1. Proxmox: Configure VNC access on the VM
+# 00. Bootstrap: Load dynamic variables from Terraform
 # ---------------------------------------------------------------------------
-- name: Configure VNC on Proxmox
+- name: "Bootstrap: Load dynamic inventory variables"
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Set bastion_ip fact from Terraform output
+      set_fact:
+        bastion_ip: "{{ (lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json') | from_json).bastion_public_ip.value }}"
+
+# ---------------------------------------------------------------------------
+# 0. Kubernetes Cluster Setup
+# ---------------------------------------------------------------------------
+- name: Configure Kubernetes nodes (common)
+  hosts: k8s_nodes
+  become: true
+  tags: [k8s_cluster]
+  roles:
+    - common
+
+- name: Configure Kubernetes masters
+  hosts: masters
+  become: true
+  tags: [k8s_cluster]
+  roles:
+    - master
+    - clone-repo-guacamole
+
+- name: Configure Kubernetes workers
+  hosts: workers
+  become: true
+  tags: [k8s_cluster]
+  roles:
+    - worker
+
+- name: Wait for Kubernetes cluster to stabilize
+  hosts: localhost
+  gather_facts: false
+  tags: [k8s_cluster]
+  tasks:
+    - name: Sleep for 120 seconds
+      ansible.builtin.pause:
+        seconds: 120
+
+# ---------------------------------------------------------------------------
+# 1. Proxmox: Configure Access on the VM
+# ---------------------------------------------------------------------------
+- name: Configure Access on Proxmox
   hosts: proxmox
   become: true
   gather_facts: true
-  tags: [vnc_setup]
-  roles:
-    - vnc_setup
+  tags: [access_setup]
+  tasks:
+    - name: Configure VNC
+      ansible.builtin.include_role:
+        name: vnc_setup
+      when: "'vnc' in connection_type"
 
-# ---------------------------------------------------------------------------
-# 2. Bastion: Nginx reverse proxy in front of Guacamole
-# ---------------------------------------------------------------------------
-- name: Setup Nginx reverse proxy for Guacamole
-  hosts: bastion
-  become: true
-  tags: [nginx_guacamole]
-  roles:
-    - nginx_guacamole
+    - name: Configure SSH
+      ansible.builtin.include_role:
+        name: ssh_setup
+      when: "'ssh' in connection_type"
 
-# ---------------------------------------------------------------------------
-# 3. Target servers: KDE desktop (only when KDE=true)
-# ---------------------------------------------------------------------------
-- name: Configure KDE desktop on target servers
-  hosts: test_servers
-  become: true
-  tags: [kde_desktop]
-  roles:
-    - kde_desktop
+    - name: Configure Windows access
+      ansible.builtin.include_role:
+        name: win_setup
+      when: "'win' in connection_type"
 
 # ---------------------------------------------------------------------------
 # 4. Localhost: Register Guacamole connection + user via API
@@ -43,10 +81,16 @@
 # ---------------------------------------------------------------------------
 # 5. Localhost: Generate and print the direct Guacamole access URL
 # ---------------------------------------------------------------------------
-- name: Print direct Guacamole access URL
+- name: Print detailed Guacamole access information
   hosts: localhost
   become: false
   tags: [guacamole_url]
-  roles:
-    - guacamole_url
+  tasks:
+    - name: Run token-url script
+      ansible.builtin.shell: "/home/jilani/playsoft-jilani-gharbi/playsoft-infra/scripts/token-url.sh"
+      register: token_url_output
+
+    - name: Display connection details
+      debug:
+        msg: "{{ token_url_output.stdout_lines }}"
 

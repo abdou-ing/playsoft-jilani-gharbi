@@ -1,0 +1,15 @@
+---
+- name: Load Terraform output
+  set_fact:
+    tf: "{{ lookup('file', tf_output_path) | from_json }}"
+
+- name: Derive VM IDs and IPs from Terraform output
+  set_fact:
+    vm_ids_list: "{{ tf.vnc_vm_ids.value | flatten }}"
+    vm_ips_list: "{{ tf.vnc_vm_ips.value | flatten }}"
+
+- name: Run SSH NAT setup for each VM
+  include_tasks: configure_ssh.yml
+  loop: "{{ range(0, vm_ids_list | length) | list }}"
+  loop_control:
+    loop_var: vm_idx

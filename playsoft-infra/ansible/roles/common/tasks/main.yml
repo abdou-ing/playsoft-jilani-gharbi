@@ -1,0 +1,7 @@
+---
+# tasks file for common
+- name: Enable containerd
+  systemd:
+    name: containerd
+    state: started
+    enabled: yes
