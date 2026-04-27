@@ -60,6 +60,17 @@ variable "template_id" {
   type = number
 }
 
+variable "private_network_cidr" {
+  description = "Private network CIDR"
+  type        = string
+}
+
+variable "gateway_ip" {
+  description = "Private network gateway IP"
+  type        = string
+}
+
+
 variable "windows_server_count" {
   description = "Number of Windows servers"
   type        = number
