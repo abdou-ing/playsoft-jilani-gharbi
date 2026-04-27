@@ -7,6 +7,7 @@ module "k8s_cluster" {
   network_id        = data.hcloud_network.main.id
   worker_count      = var.worker_count
   master_private_ip = var.k8s_master_private_ip
+  gateway_ip        = var.gateway_ip
 }
 
 module "edge" {
@@ -16,16 +17,27 @@ module "edge" {
   server_type     = var.server_type
   ssh_key_name    = var.ssh_key_name
   network_id      = data.hcloud_network.main.id
-  edge_private_ip = var.edge_private_ip
-  my_ip           = var.my_ip
+  edge_private_ip      = var.edge_private_ip
+  my_ip                = var.my_ip
+  private_network_cidr = var.private_network_cidr
 }
 
 module "vnc_server" {
   count  = var.vnc_server_count
   source = "./modules/vnc-server"
-  vm_id  = 201 + count.index
+  vm_id  = var.vnc_base_vm_id + count.index
 
   node_name   = var.node_name
   template_id = var.template_id
 }
+
+module "windows_server" {
+  count  = var.windows_server_count
+  source = "./modules/vnc-server"
+  vm_id  = var.windows_base_vm_id + count.index
+
+  node_name   = var.node_name
+  template_id = var.windows_template_id
+}
+
 

@@ -14,11 +14,13 @@ resource "hcloud_server" "master" {
   network {
     network_id = var.network_id
     ip         = var.master_private_ip
-    alias_ips = []
+    alias_ips  = []
 
   }
 
-  user_data = file("${path.module}/../../cloud-init/master.yaml")
+  user_data = templatefile("${path.module}/../../cloud-init/master.yaml", {
+    gateway_ip = var.gateway_ip
+  })
 
   labels = {
     role       = "master"
@@ -45,7 +47,9 @@ resource "hcloud_server" "worker" {
     ip         = cidrhost(var.network_cidr, var.worker_base_offset + count.index)
   }
 
-  user_data = file("${path.module}/../../cloud-init/master.yaml")
+  user_data = templatefile("${path.module}/../../cloud-init/master.yaml", {
+    gateway_ip = var.gateway_ip
+  })
 
   labels = {
     role       = "worker"

@@ -49,5 +49,10 @@ variable "role_worker_selector" {
 variable "network_cidr" {
   description = "Private network CIDR to calculate worker IPs"
   type        = string
-  default     = "10.20.0.0/24"
 }
+
+variable "gateway_ip" {
+  description = "Private network gateway IP"
+  type        = string
+}
+

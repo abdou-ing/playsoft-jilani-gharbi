@@ -4,9 +4,11 @@ resource "hcloud_server" "edge" {
   server_type = var.server_type
   location    = var.location
   ssh_keys    = [var.ssh_key_name]
- 
 
-  user_data = file("${path.module}/../../cloud-init/edge.yaml")
+
+  user_data = templatefile("${path.module}/../../cloud-init/edge.yaml", {
+    private_network_cidr = var.private_network_cidr
+  })
 
   public_net {
     ipv4_enabled = true
@@ -16,7 +18,7 @@ resource "hcloud_server" "edge" {
   network {
     network_id = var.network_id
     ip         = var.edge_private_ip
-    alias_ips = []
+    alias_ips  = []
   }
 }
 
@@ -36,13 +38,13 @@ resource "hcloud_firewall" "edge_fw" {
     port       = "80"
     source_ips = [var.my_ip]
   }
-    rule {
+  rule {
     direction  = "in"
     protocol   = "tcp"
     port       = "8080"
     source_ips = [var.my_ip]
   }
- rule {
+  rule {
     direction  = "in"
     protocol   = "tcp"
     port       = "6443"
