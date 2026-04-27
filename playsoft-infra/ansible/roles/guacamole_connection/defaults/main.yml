@@ -1,7 +1,7 @@
 ---
 # Guacamole admin credentials
-auth_username: "bob"
-auth_password: "bob"
+auth_username: "changeMe"
+auth_password: "changeMe"
 
 # Single Terraform output JSON (terraform-k8s — contains bastion_public_ip + vnc_vm_ids)
 tf_output_path_root: "~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json"
@@ -15,10 +15,11 @@ user_email_domain: "example.com"
 connection_prefix: "candidat-exam"
 vnc_hostname: "138.201.200.168"
 vnc_base_port: 5910  
+max_connections_per_user: 2
 
 # SSH Connection Authentication (parameters)
 ssh_user: "student"
-ssh_password: "Asd8=1HGge+r"
+ssh_password: "changeMe"
 
 # Populated at runtime from vm_ids Terraform output
 guacamole_users: []
