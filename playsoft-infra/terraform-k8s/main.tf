@@ -8,6 +8,7 @@ module "k8s_cluster" {
   worker_count      = var.worker_count
   master_private_ip = var.k8s_master_private_ip
   gateway_ip        = var.gateway_ip
+  network_cidr      = var.private_network_cidr
 }
 
 module "edge" {

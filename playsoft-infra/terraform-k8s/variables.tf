@@ -53,9 +53,36 @@ variable "proxmox_api_token_secret" {
 }
 
 variable "node_name" {
-  type    = string
+  type = string
 }
 
 variable "template_id" {
-  type    = number
+  type = number
 }
+
+variable "windows_server_count" {
+  description = "Number of Windows servers"
+  type        = number
+  default     = 0
+}
+
+variable "windows_template_id" {
+  description = "Template ID for Windows VMs"
+  type        = number
+  default     = 8000
+}
+
+variable "vnc_base_vm_id" {
+  description = "Starting VM ID for VNC servers"
+  type        = number
+  default     = 201
+}
+
+variable "windows_base_vm_id" {
+  description = "Starting VM ID for Windows servers"
+  type        = number
+  default     = 401
+}
+
+
+
