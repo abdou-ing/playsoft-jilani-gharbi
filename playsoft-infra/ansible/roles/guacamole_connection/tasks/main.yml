@@ -68,7 +68,8 @@
           'username_idx': idx,
           'parameters': {
             'username': win_user,
-            'password': win_password
+            'password': win_password,
+            'rdp_ignore_server_certs': rdp_ignore_server_certs | bool
           }
         }]
       }}
@@ -152,6 +153,7 @@
     port: "{{ item.port }}"
     username: "{{ item.parameters.username }}"
     password: "{{ item.parameters.password }}"
+    rdp_ignore_server_certs: "{{ item.parameters.rdp_ignore_server_certs }}"
     max_connections: "4"
   loop: "{{ guac_win_connections | default([]) }}"
   loop_control:

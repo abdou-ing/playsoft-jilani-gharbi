@@ -29,7 +29,7 @@ USERNAME="${USER_PREFIX}1"
 PASSWORD="${USER_PASS_PREFIX}1"
 
 # Determine connection types from all.yml to avoid strict errors on disabled types
-CONN_TYPES=$(grep -A 10 "^connection_type:" "${ANSIBLE_VARS}" | grep -E "^\s*-\s*\"?(vnc|ssh|win)\"?" | sed 's/.*-\s*//' | tr -d '"' | tr -d "'")
+CONN_TYPES=$(grep -A 10 "^connection_type:" "${ANSIBLE_VARS}" | grep -v "^\s*#" | grep -E "^\s*-\s*\"?(vnc|ssh|win)\"?" | sed 's/.*-\s*//' | tr -d '"' | tr -d "'")
 IS_VNC=$(echo "${CONN_TYPES}" | grep -q "vnc" && echo "true" || echo "false")
 IS_SSH=$(echo "${CONN_TYPES}" | grep -q "ssh" && echo "true" || echo "false")
 IS_WIN=$(echo "${CONN_TYPES}" | grep -q "win" && echo "true" || echo "false")

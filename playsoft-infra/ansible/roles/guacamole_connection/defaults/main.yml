@@ -24,6 +24,7 @@ ssh_password: "Asd8=1HGge+r"
 win_user: "Administrator"
 win_password: "ChangeMe123!"
 win_rdp_base_port: 3301
+rdp_ignore_server_certs: true
 
 # Populated at runtime from vm_ids Terraform output
 guacamole_users: []
