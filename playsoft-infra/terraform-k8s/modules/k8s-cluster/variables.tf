@@ -51,3 +51,9 @@ variable "network_cidr" {
   type        = string
   default     = "10.20.0.0/24"
 }
+
+variable "gateway_ip" {
+  description = "Private network gateway IP"
+  type        = string
+}
+

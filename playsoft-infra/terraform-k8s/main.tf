@@ -7,6 +7,8 @@ module "k8s_cluster" {
   network_id        = data.hcloud_network.main.id
   worker_count      = var.worker_count
   master_private_ip = var.k8s_master_private_ip
+  gateway_ip        = var.gateway_ip
+  network_cidr      = var.private_network_cidr
 }
 
 module "edge" {
@@ -16,8 +18,9 @@ module "edge" {
   server_type     = var.server_type
   ssh_key_name    = var.ssh_key_name
   network_id      = data.hcloud_network.main.id
-  edge_private_ip = var.edge_private_ip
-  my_ip           = var.my_ip
+  edge_private_ip      = var.edge_private_ip
+  my_ip                = var.my_ip
+  private_network_cidr = var.private_network_cidr
 }
 
 module "vnc_server" {

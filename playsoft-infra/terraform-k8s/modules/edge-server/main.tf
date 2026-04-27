@@ -6,7 +6,9 @@ resource "hcloud_server" "edge" {
   ssh_keys    = [var.ssh_key_name]
  
 
-  user_data = file("${path.module}/../../cloud-init/edge.yaml")
+  user_data = templatefile("${path.module}/../../cloud-init/edge.yaml", {
+    private_network_cidr = var.private_network_cidr
+  })
 
   public_net {
     ipv4_enabled = true

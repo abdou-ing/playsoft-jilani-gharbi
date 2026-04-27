@@ -8,7 +8,7 @@ write_files:
 
       [Network]
       DHCP=yes
-      Gateway=10.20.0.1
+      Gateway=${gateway_ip}
     append: true
 
   - path: /etc/systemd/resolved.conf
