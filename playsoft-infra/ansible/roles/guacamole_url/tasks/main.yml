@@ -1,24 +1,15 @@
 ---
-######################################################################
-# Generate a Guacamole direct-access URL for each user
-# Users are derived from the same Proxmox vm_ids Terraform output
-######################################################################
-
-- name: Load root Terraform output (edge public IP)
+- name: Load Terraform output (terraform-k8s)
   set_fact:
     tf: "{{ lookup('file', tf_output_path_root) | from_json }}"
 
-- name: Load Proxmox Terraform output (VM IDs)
-  set_fact:
-    tf_proxmox: "{{ lookup('file', tf_output_path_proxmox) | from_json }}"
-
 - name: Derive VM list
   set_fact:
-    vm_ids_list: "{{ tf_proxmox.vm_ids.value }}"
+    vm_ids_list: "{{ tf.vnc_vm_ids.value | flatten }}"
 
 - name: Derive Guacamole base URL
   set_fact:
-    guac_base_url: "http://{{ tf.edge_public_ip.value }}"
+    guac_base_url: "http://{{ tf.bastion_public_ip.value }}/guacamole/"
 
 # ─── Rebuild guacamole_users (same logic as guacamole_connection) ──
 - name: Build guacamole_users list from VM count
@@ -34,6 +25,8 @@
   loop_control:
     index_var: idx
     label: "VM {{ item }} → {{ user_prefix }}{{ idx + 1 }}"
+  when: guacamole_users | length == 0
+
 
 - name: Fetch token and print URL for each user
   include_tasks: per_user_url.yml

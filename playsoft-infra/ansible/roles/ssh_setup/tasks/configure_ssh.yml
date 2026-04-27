@@ -1,0 +1,32 @@
+---
+- name: "Set destination IP and SSH NAT port for VM {{ vm_ids_list[vm_idx] }}"
+  set_fact:
+    current_vmid: "{{ vm_ids_list[vm_idx] }}"
+    current_ip: "{{ vm_ips_list[vm_idx] }}"
+    # e.g., if vmid is 201, port will be 2201. If vmid is 202 => 2202.
+    ssh_nat_port: "{{ 2200 + (vm_ids_list[vm_idx] | int - 200) }}"
+
+- name: "Display chosen SSH port for VMID {{ current_vmid }}"
+  debug:
+    msg: "Forwarding TCP {{ ssh_nat_port }} to VM {{ current_vmid }} ({{ current_ip }}:22)"
+
+- name: "NAT PREROUTING: Forward port {{ ssh_nat_port }} to {{ current_ip }}:22"
+  ansible.builtin.iptables:
+    table: nat
+    chain: PREROUTING
+    protocol: tcp
+    destination_port: "{{ ssh_nat_port }}"
+    jump: DNAT
+    to_destination: "{{ current_ip }}:22"
+    state: present
+    comment: "SSH NAT for VM {{ current_vmid }}"
+
+- name: "Filter FORWARD: Accept traffic to {{ current_ip }}:22"
+  ansible.builtin.iptables:
+    chain: FORWARD
+    protocol: tcp
+    destination: "{{ current_ip }}"
+    destination_port: "22"
+    jump: ACCEPT
+    state: present
+    comment: "Allow SSH to VM {{ current_vmid }}"

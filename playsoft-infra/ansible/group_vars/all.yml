@@ -20,4 +20,8 @@ user_email_domain: "example.com"
 
 connection_prefix: "exam"
 vnc_hostname: "138.201.200.168"
-vnc_base_port: 5901          # port = vnc_base_port + index (1-based)
+vnc_base_port: 5910       # port = vnc_base_port + index (1-based)
+
+connection_type:
+  - "vnc"
+  - "ssh"
