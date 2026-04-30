@@ -1,0 +1,68 @@
+---
+- name: Cleanup Proxmox SSH NAT
+  hosts: proxmox
+  become: true
+  tasks:
+    - name: Load Terraform output
+      set_fact:
+        tf: "{{ lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json') | from_json }}"
+
+    - name: Derive VM IDs and IPs
+      set_fact:
+        vm_ids_list: "{{ tf.vnc_vm_ids.value | flatten }}"
+        vm_ips_list: "{{ tf.vm_ips.value | flatten }}"
+
+    - name: Remove NAT PREROUTING rules for SSH (with comment)
+      ansible.builtin.iptables:
+        table: nat
+        chain: PREROUTING
+        protocol: tcp
+        destination_port: "{{ 2200 + (item | int - 200) }}"
+        jump: DNAT
+        to_destination: "{{ vm_ips_list[vm_ids_list.index(item)] }}:22"
+        state: absent
+        comment: "SSH NAT for VM {{ item }}"
+      loop: "{{ vm_ids_list }}"
+      ignore_errors: true
+
+    - name: Remove NAT PREROUTING rules for SSH (without comment)
+      ansible.builtin.iptables:
+        table: nat
+        chain: PREROUTING
+        protocol: tcp
+        destination_port: "{{ 2200 + (item | int - 200) }}"
+        jump: DNAT
+        to_destination: "{{ vm_ips_list[vm_ids_list.index(item)] }}:22"
+        state: absent
+      loop: "{{ vm_ids_list }}"
+      ignore_errors: true
+
+    - name: Remove FORWARD rules for SSH (with comment)
+      ansible.builtin.iptables:
+        chain: FORWARD
+        protocol: tcp
+        destination: "{{ vm_ips_list[vm_ids_list.index(item)] }}"
+        destination_port: "22"
+        jump: ACCEPT
+        state: absent
+        comment: "Allow SSH to VM {{ item }}"
+      loop: "{{ vm_ids_list }}"
+      ignore_errors: true
+
+    - name: Remove FORWARD rules for SSH (without comment)
+      ansible.builtin.iptables:
+        chain: FORWARD
+        protocol: tcp
+        destination: "{{ vm_ips_list[vm_ids_list.index(item)] }}"
+        destination_port: "22"
+        jump: ACCEPT
+        state: absent
+      loop: "{{ vm_ids_list }}"
+      ignore_errors: true
+
+      # Without this, removed rules will come back after reboot.
+      # netfilter-persistent saves current memory rules to disk:
+      # /etc/iptables/rules.v4 and /etc/iptables/rules.v6
+      # On next boot, those files are restored into the kernel.
+    # - name: Save iptables rules
+    #   command: netfilter-persistent save

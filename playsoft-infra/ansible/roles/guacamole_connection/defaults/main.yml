@@ -1,13 +1,11 @@
 ---
 # Guacamole admin credentials
-auth_username: ""
-auth_password: ""
+auth_username: "changeMe"
+auth_password: "changeMe"
 
-# Path to root Terraform output JSON (edge_public_ip)
-tf_output_path_root: "~/playsoft-jilani-gharbi/playsoft-infra/terraform/tf_output.json"
-
-# Path to Proxmox Terraform output JSON (vm_ids)
-tf_output_path_proxmox: "~/playsoft-jilani-gharbi/playsoft-infra/terraform/modules/vnc-server/tf_output.json"
+# Single Terraform output JSON (terraform-k8s — contains bastion_public_ip + vnc_vm_ids)
+tf_output_path_root: "~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json"
+tf_output_path_proxmox: "~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json"
 
 # Template config — auto-generates one user per VM
 user_prefix: "candidat"
@@ -16,7 +14,12 @@ user_organization: "playsoft"
 user_email_domain: "example.com"
 connection_prefix: "candidat-exam"
 vnc_hostname: "138.201.200.168"
-vnc_base_port: 5901   
+vnc_base_port: 5910  
+max_connections_per_user: 2
+
+# SSH Connection Authentication (parameters)
+ssh_user: "student"
+ssh_password: "changeMe"
 
 # Populated at runtime from vm_ids Terraform output
 guacamole_users: []

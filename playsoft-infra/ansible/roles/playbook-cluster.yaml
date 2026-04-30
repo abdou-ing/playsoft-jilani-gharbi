@@ -1,0 +1,16 @@
+- hosts: k8s_nodes
+  become: true
+  roles:
+    - common
+
+- hosts: masters
+  become: true
+  roles:
+    - master
+    - clone-repo-guacamole
+
+- hosts: workers
+  become: true
+  roles:
+    - worker
+

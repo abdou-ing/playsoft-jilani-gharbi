@@ -33,7 +33,10 @@ write_files:
       server {
         listen 80;
         server_name ${PUBLIC_IP};
-
+            location /xyz123xyz456 {
+        return 302 "http://guacamole.playsoft.io/#/?token=C6F220976578A083CD25E3121111045D90598B323878F1F26EC176E7A88AD70D";
+        }
+        
         location / {
           proxy_pass http://10.20.0.3:8080/guacamole/;
           proxy_http_version 1.1;

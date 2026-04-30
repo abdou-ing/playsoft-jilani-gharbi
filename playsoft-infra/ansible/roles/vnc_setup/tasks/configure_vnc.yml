@@ -3,8 +3,9 @@
   block:
     - name: "Set deterministic VNC display + TCP port for VMID {{ current_vmid }}"
       set_fact:
-        vnc_port: "{{ start_vnc_port | int + vm_loop_index | int }}"
-        firewall_port: "{{ 5900 + start_vnc_port | int + vm_loop_index | int }}"
+        vnc_port: "{{ (vnc_base_port | int - 5900) + (current_vmid | int - 201) }}"
+        firewall_port: "{{ vnc_base_port | int + (current_vmid | int - 201) }}"
+
 
     - name: "Display chosen VNC port for VMID {{ current_vmid }}"
       debug:
@@ -12,7 +13,7 @@
 
     - name: "Apply VNC args on VM {{ current_vmid }}"
       command: >
-        qm set {{ current_vmid }} -args "-vnc 0.0.0.0:{{ vnc_port }}"
+        qm set {{ current_vmid | int }} -args "-vnc 0.0.0.0:{{ vnc_port }}"
 
     - name: "Allow VNC port through firewall for VMID {{ current_vmid }}"
       ansible.builtin.iptables:
@@ -25,5 +26,5 @@
       become: true
 
     - name: "Restart VM {{ current_vmid }} to apply VNC changes"
-      shell: "qm stop {{ current_vmid }} && qm start {{ current_vmid }}"
+      shell: "qm stop {{ current_vmid | int }} && qm start {{ current_vmid | int }}"
       ignore_errors: true  # In case VM is already stopped

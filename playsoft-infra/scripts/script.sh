@@ -13,9 +13,6 @@ HCLOUD_TOKEN=${HCLOUD_TOKEN:? "❌ ERROR: HCLOUD_TOKEN is not set!"}
 # SSH key name used by Terraform
 SSH_KEY_NAME="jilani-key"
 
-# Allowed IP for firewall rules (currently wide-open)
-MY_IP="0.0.0.0/0"
-
 # Terraform variables file
 TFVARS_FILE="env/dev.tfvars"
 
@@ -27,91 +24,42 @@ echo "🚀 Starting Packer & Terraform automation workflow..."
 echo "-----------------------------------------------------"
 
 # -------------------------------------------------------------------
-#                       PACKER BUILD — BASTION
+#                       PACKER BUILD — K8S CLUSTER
 # -------------------------------------------------------------------
-echo "📦 Running Packer build for Bastion (#1)..."
+echo "📦 Running Packer build for k8s-cluster (#1)..."
 
-cd ~/playsoft-jilani-gharbi/playsoft-infra/packer/bastion
+cd ~/playsoft-jilani-gharbi/playsoft-infra/packer/k8s-cluster
 
-# packer build \
-#   -var "hcloud_token=$HCLOUD_TOKEN" \
-#   -var-file="$PKR_VARS_FILE" \
-#   .
+# packer build . 
 
-echo "✅ Packer build for Bastion completed."
-
-# -------------------------------------------------------------------
-#                     PACKER BUILD — GUACAMOLE
-# -------------------------------------------------------------------
-echo "📦 Running Packer build for Guacamole (#2)..."
-
-cd ~/playsoft-jilani-gharbi/playsoft-infra/packer/guacamole
-
-# packer build \
-#   -var "hcloud_token=$HCLOUD_TOKEN" \
-#   -var-file="$PKR_VARS_FILE" \
-#   .
-
-echo "✅ Packer build for Guacamole completed."
+echo "✅ Packer build for k8s-cluster completed."
 
 # -------------------------------------------------------------------
 #                       TERRAFORM — HETZNER CLOUD
 # -------------------------------------------------------------------
 echo "🌍 Running Terraform for Hetzner servers..."
 
-cd ~/playsoft-jilani-gharbi/playsoft-infra/terraform
+cd ~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s
 
-terraform apply \
-  -var="ssh_key_name=$SSH_KEY_NAME" \
-  -var="my_ip=$MY_IP" \
-  -var-file="$TFVARS_FILE" \
-  -auto-approve
+#terraform apply -var-file=env/dev.tfvars -auto-approve
+
+cd ~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s
 
 echo "📥 Exporting Terraform outputs to JSON..."
 terraform output -json > tf_output.json
 
 echo "✅ Terraform apply completed."
 
-# -------------------------------------------------------------------
-#                       TERRAFORM — PROXMOX VMS
-# -------------------------------------------------------------------
-echo "🌍 Running Terraform for Proxmox VMs..."
-
-cd ~/playsoft-jilani-gharbi/playsoft-infra/terraform/modules/vnc-server
-
-terraform apply -auto-approve
-
-echo "📥 Exporting Terraform outputs to JSON..."
-terraform output -json > tf_output.json
-
-echo "✅ Proxmox Terraform apply completed."
 
 # -------------------------------------------------------------------
-#                       ANSIBLE — PROXMOX CONFIGURATION
+#                       ANSIBLE — FULL DEPLOYMENT
 # -------------------------------------------------------------------
 
-echo "🌍 Running Ansible playbook to configure Proxmox VMs..."
+echo "🌍 Running Ansible playbook for full configuration..."
 cd ~/playsoft-jilani-gharbi/playsoft-infra/ansible
-ansible-playbook site.yml --tags vnc_setup
-echo "✅ Proxmox VMs configured successfully."
+ansible-playbook site.yml --tags "access_setup,k8s_cluster,guacamole_connection,guacamole_url"
 
-# -------------------------------------------------------------------
-#                       ANSIBLE — GUACAMOLE SETUP
-# -------------------------------------------------------------------
-echo "🌍 Running Ansible playbook to create VNC connections..."
 
-cd ~/playsoft-jilani-gharbi/playsoft-infra/ansible
 
-# Background port-forwarding for Guacamole web UI
-# (needed so Ansible can reach the Guacamole API at http://<edge-ip>:8080)
-ssh -o StrictHostKeyChecking=accept-new guacamole \
-  "setsid kubectl port-forward -n guacamole svc/guacamole-web 8080:8080 --address 0.0.0.0 >/dev/null 2>&1 < /dev/null &"
-
-# Small wait to let the port-forward establish before Ansible hits the API
-sleep 3
-
-ansible-playbook site.yml --tags guacamole_connection
-
-ansible-playbook site.yml --tags guacamole_url
 
 echo "🎉 Deployment complete!"
