@@ -1,0 +1,62 @@
+# Start with Ubuntu 24.04 base image
+FROM ubuntu:24.04
+
+# Set environment variables to ensure non-interactive installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Update and install the required packages to enhance the server-like environment
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        vim \
+        wget \
+        curl \
+        openssh-server \
+        net-tools \
+        sudo \
+        iputils-ping \
+        dnsutils \
+        rsync \
+        lsof \
+        htop \
+        less \
+        nano \
+        tree \
+        unzip \
+        zip \
+        tar \
+        software-properties-common \
+        gnupg \
+        lsb-release \
+        cron \
+        man-db \
+        jq \
+        iproute2 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create ansible_user, add to sudoers, and set up SSH access
+RUN useradd -m -s /bin/bash ansible_user && \
+    echo "ansible_user:Labby123" | sudo chpasswd && \
+    echo "ansible_user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ansible_user  && \
+    mkdir -p /home/ansible_user/.ssh && \
+    chown ansible_user:ansible_user /home/ansible_user/.ssh && \
+    chmod 700 /home/ansible_user/.ssh && \
+    mkdir -p /etc/ansible && \
+    chown -R ansible_user:ansible_user /etc/ansible &&\
+    userdel -r ubuntu
+
+# Configure SSH server
+RUN mkdir -p /run/sshd  
+#&& \
+#    echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config && \
+#    echo 'PermitRootLogin no' >> /etc/ssh/sshd_config && \
+#    echo 'AllowUsers ansible_user' >> /etc/ssh/sshd_config
+
+# Set the default user to ansible_user
+USER ansible_user
+WORKDIR /home/ansible_user
+
+# Expose SSH port
+EXPOSE 22
+
+## Start SSH service
+#CMD ["/usr/sbin/sshd", "-D"]

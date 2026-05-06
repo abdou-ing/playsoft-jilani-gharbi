@@ -1,0 +1,52 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        vim \
+        wget \
+        curl \
+        openssh-server \
+        net-tools \
+        sudo \
+        iputils-ping \
+        dnsutils \
+        rsync \
+        lsof \
+        htop \
+        less \
+        nano \
+        tree \
+        unzip \
+        zip \
+        tar \
+        software-properties-common \
+        gnupg \
+        lsb-release \
+        cron \
+        man-db \
+        jq \
+        iproute2 && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash ansible_user && \
+    echo "ansible_user:Labby123" | chpasswd && \
+    echo "ansible_user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ansible_user && \
+    chmod 0440 /etc/sudoers.d/ansible_user && \
+    mkdir -p /home/ansible_user/.ssh && \
+    chown -R ansible_user:ansible_user /home/ansible_user/.ssh && \
+    chmod 700 /home/ansible_user/.ssh && \
+    mkdir -p /etc/ansible && \
+    chown -R ansible_user:ansible_user /etc/ansible && \
+    userdel -r ubuntu 2>/dev/null || true
+
+RUN mkdir -p /run/sshd && \
+    ssh-keygen -A && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    echo 'PermitRootLogin no' >> /etc/ssh/sshd_config && \
+    echo 'AllowUsers ansible_user' >> /etc/ssh/sshd_config
+
+EXPOSE 22
+
+CMD ["/bin/bash", "-c", "/usr/sbin/sshd && sleep infinity"]

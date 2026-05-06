@@ -1,0 +1,64 @@
+# Start with CentOS 8 base image
+FROM centos:8
+
+# Set environment variables to ensure non-interactive installation
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+
+# Update repository configuration to use the CentOS Vault
+RUN sed -i 's|mirrorlist=|#mirrorlist=|g' /etc/yum.repos.d/CentOS-*.repo && \
+    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*.repo
+
+# Update and install required packages
+RUN yum update -y && \
+    yum install -y \
+        vim \
+        wget \
+        curl \
+        openssh-server \
+        net-tools \
+        sudo \
+        iputils \
+        bind-utils \
+        rsync \
+        lsof \
+        less \
+        nano \
+        tree \
+        unzip \
+        zip \
+        tar \
+        cronie \
+        man-db \
+        initscripts \
+        iproute && \
+    yum clean all
+
+# Create ansible_user, add to sudoers, and set up SSH access
+RUN useradd -m -s /bin/bash ansible_user && \
+    echo "ansible_user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    mkdir -p /home/ansible_user/.ssh && \
+    chown ansible_user:ansible_user /home/ansible_user/.ssh && \
+    chmod 700 /home/ansible_user/.ssh && \
+    ssh-keygen -t rsa -b 4096 -f /home/ansible_user/.ssh/id_rsa -q -N "" && \
+    cat /home/ansible_user/.ssh/id_rsa.pub >> /home/ansible_user/.ssh/authorized_keys && \
+    chown ansible_user:ansible_user /home/ansible_user/.ssh/* && \
+    chmod 600 /home/ansible_user/.ssh/authorized_keys && \
+    mkdir -p /etc/ansible && \
+    chown -R ansible_user:ansible_user /etc/ansible
+
+# Configure SSH server
+RUN mkdir -p /run/sshd && \
+    echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config && \
+    echo 'PermitRootLogin no' >> /etc/ssh/sshd_config && \
+    echo 'AllowUsers ansible_user' >> /etc/ssh/sshd_config
+
+# Set the default user to ansible_user
+USER ansible_user
+WORKDIR /home/ansible_user
+
+# Expose SSH port
+EXPOSE 22
+
+# Start SSH service
+#CMD ["/usr/sbin/sshd", "-D"]
