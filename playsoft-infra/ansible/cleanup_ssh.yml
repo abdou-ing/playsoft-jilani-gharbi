@@ -17,7 +17,7 @@
         table: nat
         chain: PREROUTING
         protocol: tcp
-        destination_port: "{{ 2200 + (item | int - 200) }}"
+        destination_port: "{{ ssh_base_port | int + (item | int - 200) }}"
         jump: DNAT
         to_destination: "{{ vm_ips_list[vm_ids_list.index(item)] }}:22"
         state: absent
@@ -30,7 +30,7 @@
         table: nat
         chain: PREROUTING
         protocol: tcp
-        destination_port: "{{ 2200 + (item | int - 200) }}"
+        destination_port: "{{ ssh_base_port | int + (item | int - 200) }}"
         jump: DNAT
         to_destination: "{{ vm_ips_list[vm_ids_list.index(item)] }}:22"
         state: absent

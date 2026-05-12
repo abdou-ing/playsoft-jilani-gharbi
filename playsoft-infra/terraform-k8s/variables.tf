@@ -52,12 +52,22 @@ variable "proxmox_api_token_secret" {
   sensitive = true
 }
 
+variable "proxmox_ssh_username" {
+  description = "Linux user used by the Proxmox provider for SSH/SFTP operations such as snippet uploads"
+  type        = string
+}
+
+variable "proxmox_ssh_private_key_path" {
+  description = "Private key path used by the Proxmox provider for SSH/SFTP operations such as snippet uploads"
+  type        = string
+}
+
 variable "node_name" {
-  type    = string
+  type = string
 }
 
 variable "template_id" {
-  type    = number
+  type = number
 }
 
 variable "private_network_cidr" {

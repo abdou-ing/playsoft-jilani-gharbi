@@ -1,9 +1,9 @@
 variable "node_name" {
-  type    = string
+  type = string
 }
 
 variable "vm_id" {
-  type    = number
+  type = number
 }
 
 variable "server_count" {
@@ -12,5 +12,10 @@ variable "server_count" {
 }
 
 variable "template_id" {
-  type    = number
+  type = number
+}
+
+variable "cloud_init_datastore_id" {
+  type    = string
+  default = "local"
 }

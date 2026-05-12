@@ -43,7 +43,7 @@
           'name': connection_prefix ~ '-' ~ (idx + 1) ~ '-ssh',
           'protocol': 'ssh',
           'hostname': vnc_hostname,
-          'port': (2200 + (item | int - 200)) | string,
+          'port': (ssh_base_port | int + (item | int - 200)) | string,
           'username_idx': idx,
           'parameters': {
             'username': ssh_user,

@@ -1,0 +1,28 @@
+---
+# check_package.yml — Verify a package is installed
+# Supports both rpm (RHEL/CentOS) and dpkg (Debian/Ubuntu)
+
+- name: "{{ exam_task.id }} | Package check: {{ exam_task.check_args.name }}"
+  when: >
+    exam_task.check_args.hosts == 'all' or
+    inventory_hostname in ([exam_task.check_args.hosts] | flatten)
+  block:
+    - name: "{{ exam_task.id }} | Check if {{ exam_task.check_args.name }} is installed"
+      ansible.builtin.shell: >
+        rpm -q {{ exam_task.check_args.name }} 2>/dev/null ||
+        dpkg -s {{ exam_task.check_args.name }} 2>/dev/null | grep -q "Status: install ok installed"
+      register: _pkg_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: "{{ exam_task.id }} | Record result"
+      set_fact:
+        exam_results: >-
+          {{
+            exam_results + [{
+              'id': exam_task.id,
+              'title': exam_task.title,
+              'host': inventory_hostname,
+              'passed': (_pkg_check.rc == 0)
+            }]
+          }}

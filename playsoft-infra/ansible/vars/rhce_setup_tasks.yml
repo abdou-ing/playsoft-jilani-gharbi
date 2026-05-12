@@ -1,0 +1,69 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# RHCE Exam Task Definitions — Section: Setup
+# Each task maps to a check_type handler in the exam_checker role.
+# ─────────────────────────────────────────────────────────────────────────────
+
+exam_tasks:
+
+  - id: setup_01_python3
+    title: "Installer python3 sur les 3 machines"
+    check_type: package
+    check_args:
+      name: python3
+      hosts: "all"
+
+  - id: setup_02_ansible_core
+    title: "Installer ansible-core sur le control node"
+    check_type: package
+    check_args:
+      name: ansible-core
+      hosts: "control-node1"
+
+  - id: setup_03_ansible_user
+    title: "Créer l'utilisateur ansible"
+    check_type: user_exists
+    check_args:
+      name: ansible
+      hosts: "all"
+
+  - id: setup_04_sudoers
+    title: "Configurer sudoers pour ansible"
+    check_type: file_contains
+    check_args:
+      path: /etc/sudoers.d/ansible
+      pattern: "ansible.*NOPASSWD"
+      hosts: "all"
+
+  - id: setup_05_ssh_key
+    title: "Copier la clé SSH vers les target nodes"
+    check_type: ssh_auth
+    check_args:
+      from: control-node1
+      to:
+        - target-node1
+        - target-node2
+      user: ansible
+
+  - id: setup_06_inventory
+    title: "Créer le fichier inventaire"
+    check_type: file_contains
+    check_args:
+      path: /home/ansible/inventory
+      pattern: "target-node1"
+      hosts: "control-node1"
+
+  - id: setup_07_ansible_cfg
+    title: "Créer ansible.cfg"
+    check_type: file_contains
+    check_args:
+      path: /home/ansible/ansible.cfg
+      pattern: "remote_user=ansible"
+      hosts: "control-node1"
+
+  - id: setup_08_ping
+    title: "Tester ansible ping"
+    check_type: ansible_ping
+    check_args:
+      target: target-node1
+      from: control-node1

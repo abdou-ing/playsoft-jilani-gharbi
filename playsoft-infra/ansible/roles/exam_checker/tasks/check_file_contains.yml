@@ -1,0 +1,26 @@
+---
+# check_file_contains.yml — Verify a file exists and contains a regex pattern
+
+- name: "{{ exam_task.id }} | File check: {{ exam_task.check_args.path }}"
+  when: >
+    exam_task.check_args.hosts == 'all' or
+    inventory_hostname in ([exam_task.check_args.hosts] | flatten)
+  block:
+    - name: "{{ exam_task.id }} | Check {{ exam_task.check_args.path }} contains pattern"
+      ansible.builtin.shell: >
+        grep -qE "{{ exam_task.check_args.pattern }}" "{{ exam_task.check_args.path }}"
+      register: _file_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: "{{ exam_task.id }} | Record result"
+      set_fact:
+        exam_results: >-
+          {{
+            exam_results + [{
+              'id': exam_task.id,
+              'title': exam_task.title,
+              'host': inventory_hostname,
+              'passed': (_file_check.rc == 0)
+            }]
+          }}

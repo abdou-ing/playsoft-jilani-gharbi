@@ -1,0 +1,25 @@
+---
+# check_user_exists.yml — Verify a system user exists
+
+- name: "{{ exam_task.id }} | User check: {{ exam_task.check_args.name }}"
+  when: >
+    exam_task.check_args.hosts == 'all' or
+    inventory_hostname in ([exam_task.check_args.hosts] | flatten)
+  block:
+    - name: "{{ exam_task.id }} | Check if user {{ exam_task.check_args.name }} exists"
+      ansible.builtin.shell: "id {{ exam_task.check_args.name }}"
+      register: _user_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: "{{ exam_task.id }} | Record result"
+      set_fact:
+        exam_results: >-
+          {{
+            exam_results + [{
+              'id': exam_task.id,
+              'title': exam_task.title,
+              'host': inventory_hostname,
+              'passed': (_user_check.rc == 0)
+            }]
+          }}
