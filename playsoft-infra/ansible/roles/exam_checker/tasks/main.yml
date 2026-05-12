@@ -1,0 +1,43 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# exam_checker/tasks/main.yml — Orchestrates all check types
+# ─────────────────────────────────────────────────────────────────────────────
+
+- name: Initialize exam results list
+  set_fact:
+    exam_results: []
+
+- name: Run package checks
+  include_tasks: check_package.yml
+  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'package') | list }}"
+  loop_control:
+    loop_var: exam_task
+    label: "{{ exam_task.id }}"
+
+- name: Run user_exists checks
+  include_tasks: check_user_exists.yml
+  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'user_exists') | list }}"
+  loop_control:
+    loop_var: exam_task
+    label: "{{ exam_task.id }}"
+
+- name: Run file_contains checks
+  include_tasks: check_file_contains.yml
+  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'file_contains') | list }}"
+  loop_control:
+    loop_var: exam_task
+    label: "{{ exam_task.id }}"
+
+- name: Run ssh_auth checks
+  include_tasks: check_ssh_auth.yml
+  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'ssh_auth') | list }}"
+  loop_control:
+    loop_var: exam_task
+    label: "{{ exam_task.id }}"
+
+- name: Run ansible_ping checks
+  include_tasks: check_ansible_ping.yml
+  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'ansible_ping') | list }}"
+  loop_control:
+    loop_var: exam_task
+    label: "{{ exam_task.id }}"

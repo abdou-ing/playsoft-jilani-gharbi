@@ -52,6 +52,16 @@ variable "proxmox_api_token_secret" {
   sensitive = true
 }
 
+variable "proxmox_ssh_username" {
+  description = "Linux user used by the Proxmox provider for SSH/SFTP operations such as snippet uploads"
+  type        = string
+}
+
+variable "proxmox_ssh_private_key_path" {
+  description = "Private key path used by the Proxmox provider for SSH/SFTP operations such as snippet uploads"
+  type        = string
+}
+
 variable "node_name" {
   type = string
 }
@@ -63,37 +73,23 @@ variable "template_id" {
 variable "private_network_cidr" {
   description = "Private network CIDR"
   type        = string
+  default     = "10.20.0.0/24"
 }
 
 variable "gateway_ip" {
   description = "Private network gateway IP"
   type        = string
+  default     = "10.20.0.1"
 }
 
 
 variable "windows_server_count" {
   description = "Number of Windows servers"
   type        = number
-  default     = 0
+  default     = 1
 }
 
 variable "windows_template_id" {
-  description = "Template ID for Windows VMs"
+  description = "Template ID for Windows VM"
   type        = number
-  default     = 8000
 }
-
-variable "vnc_base_vm_id" {
-  description = "Starting VM ID for VNC servers"
-  type        = number
-  default     = 201
-}
-
-variable "windows_base_vm_id" {
-  description = "Starting VM ID for Windows servers"
-  type        = number
-  default     = 401
-}
-
-
-

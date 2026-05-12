@@ -3,9 +3,14 @@
   set_fact:
     tf: "{{ lookup('file', tf_output_path_root) | from_json }}"
 
-- name: Derive VM list
+- name: Derive VM lists
   set_fact:
-    vm_ids_list: "{{ tf.vnc_vm_ids.value | flatten }}"
+    linux_vm_ids_list: "{{ (tf.vnc_vm_ids.value | flatten) if (tf.vnc_vm_ids is defined and tf.vnc_vm_ids.value is defined) else [] }}"
+    windows_vm_ids_list: "{{ (tf.windows_vm_ids.value | flatten) if (tf.windows_vm_ids is defined and tf.windows_vm_ids.value is defined) else [] }}"
+
+- name: Derive candidate count across enabled connection types
+  set_fact:
+    candidate_count: "{{ [linux_vm_ids_list | length, windows_vm_ids_list | length] | max }}"
 
 - name: Derive Guacamole base URL
   set_fact:
@@ -21,10 +26,10 @@
           'password': user_password_prefix ~ (idx + 1)
         }]
       }}
-  loop: "{{ vm_ids_list }}"
+  loop: "{{ range(0, candidate_count | int) | list }}"
   loop_control:
     index_var: idx
-    label: "VM {{ item }} → {{ user_prefix }}{{ idx + 1 }}"
+    label: "{{ user_prefix }}{{ idx + 1 }}"
   when: guacamole_users | length == 0
 
 

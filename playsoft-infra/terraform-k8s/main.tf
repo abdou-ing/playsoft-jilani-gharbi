@@ -26,19 +26,17 @@ module "edge" {
 module "vnc_server" {
   count  = var.vnc_server_count
   source = "./modules/vnc-server"
-  vm_id  = var.vnc_base_vm_id + count.index
+  vm_id  = 201 + count.index
 
   node_name   = var.node_name
   template_id = var.template_id
 }
 
-module "windows_server" {
-  count  = var.windows_server_count
-  source = "./modules/vnc-server"
-  vm_id  = var.windows_base_vm_id + count.index
+module "windows_vm" {
+  source = "./modules/windows-vm"
 
-  node_name   = var.node_name
-  template_id = var.windows_template_id
+  node_name    = var.node_name
+  template_id  = var.windows_template_id
+  server_count = var.windows_server_count
+  vm_id        = 401
 }
-
-

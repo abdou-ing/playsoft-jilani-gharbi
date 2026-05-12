@@ -14,23 +14,14 @@ output "vnc_vm_ids" {
   value = module.vnc_server[*].vm_ids
 }
 
+output "vnc_vm_ips" {
+  value = [for server in module.vnc_server : server.primary_ipv4_address]
+}
+
 output "windows_vm_ids" {
-  value = module.windows_server[*].vm_ids
+  value = module.windows_vm.vm_ids
 }
 
-output "vm_ips" {
-  value = concat(
-    [for module in module.vnc_server : module.primary_ipv4_address],
-    [for module in module.windows_server : module.primary_ipv4_address]
-  )
+output "windows_vm_ips" {
+  value = module.windows_vm.primary_ipv4_addresses
 }
-
-
-
-
-
-
-
-
-
-

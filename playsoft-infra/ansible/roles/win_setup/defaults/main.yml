@@ -1,0 +1,14 @@
+---
+# Path to the Terraform output JSON
+tf_output_path: "~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json"
+
+# External port used to expose the first Windows VM over Proxmox NAT.
+win_rdp_base_port: 3301
+
+# Windows guest connection settings
+win_network_interface_alias: "Ethernet"
+win_firewall_rule_name: "RDP from Proxmox"
+
+# Retry budget while the cloned Windows VM finishes booting and starts WinRM.
+win_setup_retries: 10
+win_setup_delay: 30

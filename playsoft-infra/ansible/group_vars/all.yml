@@ -20,8 +20,26 @@ user_email_domain: "example.com"
 
 connection_prefix: "exam"
 vnc_hostname: "138.201.200.168"
-vnc_base_port: 5910       # port = vnc_base_port + index (1-based)
+vnc_base_port: 5930       # port = vnc_base_port + index (1-based)
+win_rdp_base_port: 3310   # port = win_rdp_base_port + index (0-based)
+ssh_base_port: 2200       # port = ssh_base_port + (vmid - 200)
+rdp_ignore_server_certs: true
+
+
+ssh_user: "student"
+ssh_password: "student"
+
+win_user: "student"
+win_password: "123456"
 
 connection_type:
-  - "vnc"
-  - "ssh"
+  # - "vnc"
+   - "ssh"
+  #- "win"
+
+# ─────────────────────────────────────────────────────────────
+# Exam node label prefix.
+# The script will generate: exam_node_prefix + N (e.g. exam-rhce-node1, exam-rhce-node2)
+# The number of labels is derived automatically from the Terraform VNC VM count.
+# ─────────────────────────────────────────────────────────────
+exam_node_prefix: "exam-rhce-node"

@@ -1,0 +1,61 @@
+---
+- name: Cleanup Proxmox Windows RDP NAT
+  hosts: proxmox
+  become: true
+  tasks:
+    - name: Load Terraform output
+      set_fact:
+        tf: "{{ lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json') | from_json }}"
+
+    - name: Derive Windows VM IDs and IPs
+      set_fact:
+        windows_vm_ids_list: "{{ (tf.windows_vm_ids.value | flatten) if (tf.windows_vm_ids is defined and tf.windows_vm_ids.value is defined) else [] }}"
+        windows_vm_ips_list: "{{ (tf.windows_vm_ips.value | flatten) if (tf.windows_vm_ips is defined and tf.windows_vm_ips.value is defined) else [] }}"
+
+    - name: Remove NAT PREROUTING rules for RDP (with comment)
+      ansible.builtin.iptables:
+        table: nat
+        chain: PREROUTING
+        protocol: tcp
+        destination_port: "{{ win_rdp_base_port | int + (item | int - 401) }}"
+        jump: DNAT
+        to_destination: "{{ windows_vm_ips_list[windows_vm_ids_list.index(item)] }}:3389"
+        state: absent
+        comment: "RDP NAT for Windows VM {{ item }}"
+      loop: "{{ windows_vm_ids_list }}"
+      ignore_errors: true
+
+    - name: Remove NAT PREROUTING rules for RDP (without comment)
+      ansible.builtin.iptables:
+        table: nat
+        chain: PREROUTING
+        protocol: tcp
+        destination_port: "{{ win_rdp_base_port | int + (item | int - 401) }}"
+        jump: DNAT
+        to_destination: "{{ windows_vm_ips_list[windows_vm_ids_list.index(item)] }}:3389"
+        state: absent
+      loop: "{{ windows_vm_ids_list }}"
+      ignore_errors: true
+
+    - name: Remove FORWARD rules for RDP (with comment)
+      ansible.builtin.iptables:
+        chain: FORWARD
+        protocol: tcp
+        destination: "{{ windows_vm_ips_list[windows_vm_ids_list.index(item)] }}"
+        destination_port: "3389"
+        jump: ACCEPT
+        state: absent
+        comment: "Allow RDP to Windows VM {{ item }}"
+      loop: "{{ windows_vm_ids_list }}"
+      ignore_errors: true
+
+    - name: Remove FORWARD rules for RDP (without comment)
+      ansible.builtin.iptables:
+        chain: FORWARD
+        protocol: tcp
+        destination: "{{ windows_vm_ips_list[windows_vm_ids_list.index(item)] }}"
+        destination_port: "3389"
+        jump: ACCEPT
+        state: absent
+      loop: "{{ windows_vm_ids_list }}"
+      ignore_errors: true

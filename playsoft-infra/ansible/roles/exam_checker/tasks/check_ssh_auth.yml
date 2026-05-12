@@ -1,0 +1,41 @@
+---
+# check_ssh_auth.yml — Verify SSH public key from 'from' host is in authorized_keys on 'to' hosts
+#
+# Logic:
+#   1. Only runs on hosts listed in check_args.to
+#   2. Reads the public key from the 'from' host via delegate_to
+#   3. Checks if that key appears in the user's authorized_keys on this host
+
+- name: "{{ exam_task.id }} | SSH auth check on target hosts"
+  when: inventory_hostname in (exam_task.check_args.to | flatten)
+  block:
+    - name: "{{ exam_task.id }} | Read public key from {{ exam_task.check_args.from }}"
+      ansible.builtin.slurp:
+        src: "/home/{{ exam_task.check_args.user }}/.ssh/id_rsa.pub"
+      register: _pubkey_raw
+      delegate_to: "{{ exam_task.check_args.from }}"
+      ignore_errors: true
+
+    - name: "{{ exam_task.id }} | Check authorized_keys on {{ inventory_hostname }}"
+      ansible.builtin.shell: >
+        grep -qF "{{ _pubkey_raw.content | b64decode | trim }}"
+        /home/{{ exam_task.check_args.user }}/.ssh/authorized_keys
+      register: _ssh_check
+      ignore_errors: true
+      changed_when: false
+      when: _pubkey_raw is not failed
+
+    - name: "{{ exam_task.id }} | Record result"
+      set_fact:
+        exam_results: >-
+          {{
+            exam_results + [{
+              'id': exam_task.id,
+              'title': exam_task.title,
+              'host': inventory_hostname,
+              'passed': (
+                (_pubkey_raw is not failed) and
+                (_ssh_check.rc | default(1)) == 0
+              )
+            }]
+          }}

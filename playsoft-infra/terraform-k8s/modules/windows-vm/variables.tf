@@ -13,12 +13,4 @@ variable "server_count" {
 
 variable "template_id" {
   type = number
-<<<<<<< HEAD
-=======
-}
-
-variable "cloud_init_datastore_id" {
-  type    = string
-  default = "local"
->>>>>>> feature/terraform
 }

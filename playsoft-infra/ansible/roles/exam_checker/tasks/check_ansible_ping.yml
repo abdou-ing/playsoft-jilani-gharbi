@@ -1,0 +1,33 @@
+---
+# check_ansible_ping.yml — Run `ansible -m ping` from the control node
+#
+# Only runs on the host specified in check_args.from.
+# Uses the student's own inventory file and ansible user key.
+
+- name: "{{ exam_task.id }} | Ansible ping check from {{ exam_task.check_args.from }}"
+  when: inventory_hostname == exam_task.check_args.from
+  block:
+    - name: "{{ exam_task.id }} | Run ansible ping to {{ exam_task.check_args.target }}"
+      ansible.builtin.shell: |
+        ansible {{ exam_task.check_args.target }} \
+          -m ping \
+          -i /home/ansible/inventory \
+          --private-key /home/ansible/.ssh/id_rsa \
+          -u ansible \
+          -o
+      register: _ping_check
+      ignore_errors: true
+      changed_when: false
+      become_user: ansible
+
+    - name: "{{ exam_task.id }} | Record result"
+      set_fact:
+        exam_results: >-
+          {{
+            exam_results + [{
+              'id': exam_task.id,
+              'title': exam_task.title,
+              'host': inventory_hostname,
+              'passed': (_ping_check.rc == 0)
+            }]
+          }}

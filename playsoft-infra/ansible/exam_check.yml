@@ -1,0 +1,49 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# exam_check.yml — Admin playbook to grade an RHCE exam
+#
+# Usage:
+#   ansible-playbook -i inventory-exam.ini exam_check.yml
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Play 1: Run all checks on exam nodes
+- name: RHCE Exam — Run checks on exam nodes
+  hosts: exam_nodes
+  gather_facts: true
+  become: true
+  vars_files:
+    - vars/rhce_setup_tasks.yml
+  roles:
+    - exam_checker
+
+# Play 2: Aggregate and print results from all hosts
+- name: RHCE Exam — Print Results Summary
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/rhce_setup_tasks.yml
+  tasks:
+    - name: Aggregate results from all exam nodes
+      set_fact:
+        all_results: "{{ all_results | default([]) + (hostvars[item].exam_results | default([])) }}"
+      loop: "{{ groups['exam_nodes'] }}"
+
+    - name: Calculate score
+      set_fact:
+        passed_count: "{{ all_results | selectattr('passed', 'equalto', true) | list | length }}"
+        total_count: "{{ all_results | length }}"
+
+    - name: Print exam results
+      debug:
+        msg: |
+          ════════════════════════════════════════════════════════
+           RHCE EXAM RESULTS
+          ════════════════════════════════════════════════════════
+          {% for result in all_results %}
+          {% if result.passed %}  ✅ PASS{% else %}  ❌ FAIL{% endif %}  [{{ result.host | upper }}]  {{ result.id }}: {{ result.title }}
+          {% endfor %}
+          ════════════════════════════════════════════════════════
+           Score: {{ passed_count }} / {{ total_count }}
+           Grade: {% if (passed_count | int / total_count | int * 100) >= 70 %}PASSED ✅{% else %}FAILED ❌{% endif %}
+
+          ════════════════════════════════════════════════════════
