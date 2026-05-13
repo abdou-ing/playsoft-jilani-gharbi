@@ -1,7 +1,7 @@
 # Sequence Diagram — Global Ansible Flow
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'textColor': '#000000', 'actorTextColor': '#000000', 'actorBkg': '#ffffff', 'actorBorderColor': '#000000', 'signalColor': '#000000', 'signalTextColor': '#000000', 'noteTextColor': '#000000', 'noteBkgColor': '#ffffff', 'noteBorderColor': '#000000', 'loopTextColor': '#000000', 'activationBorderColor': '#000000', 'activationBkgColor': '#ffffff'}}}%%
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'textColor': '#000000', 'actorTextColor': '#000000', 'actorBkg': '#f5f5f5', 'actorBorderColor': '#333333', 'signalColor': '#333333', 'signalTextColor': '#000000', 'noteTextColor': '#000000', 'noteBkgColor': '#ffffcc', 'noteBorderColor': '#333333', 'loopTextColor': '#000000', 'activationBorderColor': '#333333', 'activationBkgColor': '#e8e8e8', 'sequenceNumberColor': '#ffffff'}}}%%
 sequenceDiagram
     autonumber
     participant Op as Lab Admin<br/>(local machine)
@@ -114,7 +114,7 @@ sequenceDiagram
 ## Cleanup Flows
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'textColor': '#000000', 'actorTextColor': '#000000', 'actorBkg': '#ffffff', 'actorBorderColor': '#000000', 'signalColor': '#000000', 'signalTextColor': '#000000', 'noteTextColor': '#000000', 'noteBkgColor': '#ffffff', 'noteBorderColor': '#000000', 'loopTextColor': '#000000', 'activationBorderColor': '#000000', 'activationBkgColor': '#ffffff'}}}%%
+%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'textColor': '#000000', 'actorTextColor': '#000000', 'actorBkg': '#f5f5f5', 'actorBorderColor': '#333333', 'signalColor': '#333333', 'signalTextColor': '#000000', 'noteTextColor': '#000000', 'noteBkgColor': '#ffffcc', 'noteBorderColor': '#333333', 'loopTextColor': '#000000', 'activationBorderColor': '#333333', 'activationBkgColor': '#e8e8e8', 'sequenceNumberColor': '#ffffff'}}}%%
 sequenceDiagram
     autonumber
     participant Op as Lab Admin<br/>(local machine)
