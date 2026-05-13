@@ -3,7 +3,7 @@
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Op as Operator
+    participant Op as Lab Admin<br/>(local machine)
     participant AC as Ansible Controller<br/>(localhost)
     participant TF as tf_output.json
     participant NAT as NAT Server
@@ -115,7 +115,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Op as Operator
+    participant Op as Lab Admin<br/>(local machine)
     participant AC as Ansible Controller
     participant TF as tf_output.json
     participant PVE as Proxmox Host
