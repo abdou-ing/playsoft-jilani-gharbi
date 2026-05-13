@@ -1,7 +1,7 @@
 # Sequence Diagram — Global Ansible Flow
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'textColor': '#000000', 'actorTextColor': '#000000', 'signalColor': '#000000', 'signalTextColor': '#000000', 'noteTextColor': '#000000', 'loopTextColor': '#000000', 'activationBorderColor': '#000000'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'textColor': '#000000', 'actorTextColor': '#000000', 'actorBkg': '#ffffff', 'actorBorderColor': '#000000', 'signalColor': '#000000', 'signalTextColor': '#000000', 'noteTextColor': '#000000', 'noteBkgColor': '#ffffff', 'noteBorderColor': '#000000', 'loopTextColor': '#000000', 'activationBorderColor': '#000000', 'activationBkgColor': '#ffffff'}}}%%
 sequenceDiagram
     autonumber
     participant Op as Lab Admin<br/>(local machine)
@@ -114,7 +114,7 @@ sequenceDiagram
 ## Cleanup Flows
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'textColor': '#000000', 'actorTextColor': '#000000', 'signalColor': '#000000', 'signalTextColor': '#000000', 'noteTextColor': '#000000', 'loopTextColor': '#000000', 'activationBorderColor': '#000000'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'textColor': '#000000', 'actorTextColor': '#000000', 'actorBkg': '#ffffff', 'actorBorderColor': '#000000', 'signalColor': '#000000', 'signalTextColor': '#000000', 'noteTextColor': '#000000', 'noteBkgColor': '#ffffff', 'noteBorderColor': '#000000', 'loopTextColor': '#000000', 'activationBorderColor': '#000000', 'activationBkgColor': '#ffffff'}}}%%
 sequenceDiagram
     autonumber
     participant Op as Lab Admin<br/>(local machine)
