@@ -1,7 +1,7 @@
 # Sequence Diagram — Global Ansible Flow
 
 ```mermaid
-%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'textColor': '#000000', 'actorTextColor': '#000000', 'actorBkg': '#f5f5f5', 'actorBorderColor': '#333333', 'signalColor': '#333333', 'signalTextColor': '#000000', 'noteTextColor': '#000000', 'noteBkgColor': '#ffffcc', 'noteBorderColor': '#333333', 'loopTextColor': '#000000', 'activationBorderColor': '#333333', 'activationBkgColor': '#e8e8e8', 'sequenceNumberColor': '#ffffff'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'primaryColor': '#f0f0f0', 'primaryTextColor': '#000000', 'primaryBorderColor': '#333333', 'lineColor': '#333333', 'textColor': '#000000', 'actorTextColor': '#000000', 'actorBkg': '#f5f5f5', 'actorBorderColor': '#333333', 'actorLineColor': '#333333', 'signalColor': '#333333', 'signalTextColor': '#000000', 'noteTextColor': '#000000', 'noteBkgColor': '#ffffee', 'noteBorderColor': '#999933', 'loopTextColor': '#000000', 'activationBorderColor': '#333333', 'activationBkgColor': '#eeeeee', 'sequenceNumberColor': '#ffffff', 'labelBoxBkgColor': '#f5f5f5', 'labelBoxBorderColor': '#333333', 'labelTextColor': '#000000'}}}%%
 sequenceDiagram
     autonumber
     participant Op as Lab Admin<br/>(local machine)
@@ -184,7 +184,7 @@ sequenceDiagram
 ## Cleanup Flows
 
 ```mermaid
-%%{init: {'theme': 'default', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'textColor': '#000000', 'actorTextColor': '#000000', 'actorBkg': '#f5f5f5', 'actorBorderColor': '#333333', 'signalColor': '#333333', 'signalTextColor': '#000000', 'noteTextColor': '#000000', 'noteBkgColor': '#ffffcc', 'noteBorderColor': '#333333', 'loopTextColor': '#000000', 'activationBorderColor': '#333333', 'activationBkgColor': '#e8e8e8', 'sequenceNumberColor': '#ffffff'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'primaryColor': '#f0f0f0', 'primaryTextColor': '#000000', 'primaryBorderColor': '#333333', 'lineColor': '#333333', 'textColor': '#000000', 'actorTextColor': '#000000', 'actorBkg': '#f5f5f5', 'actorBorderColor': '#333333', 'actorLineColor': '#333333', 'signalColor': '#333333', 'signalTextColor': '#000000', 'noteTextColor': '#000000', 'noteBkgColor': '#ffffee', 'noteBorderColor': '#999933', 'loopTextColor': '#000000', 'activationBorderColor': '#333333', 'activationBkgColor': '#eeeeee', 'sequenceNumberColor': '#ffffff', 'labelBoxBkgColor': '#f5f5f5', 'labelBoxBorderColor': '#333333', 'labelTextColor': '#000000'}}}%%
 sequenceDiagram
     autonumber
     participant Op as Lab Admin<br/>(local machine)
