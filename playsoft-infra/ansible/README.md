@@ -4,6 +4,40 @@ Automates provisioning of exam lab environments on top of Proxmox and a Kubernet
 
 ---
 
+> **Before you start — required setup**
+>
+> **1. Adapt all file paths**
+> Every path referencing the project directory must match your local setup. Search for `<YOUR_PROJECT_PATH>` across all files and replace it with your actual absolute path:
+> ```
+> # Example
+> /home/<YOUR_USER>/<YOUR_PROJECT_PATH>/playsoft-infra/terraform-k8s/tf_output.json
+> ```
+> Files that contain hardcoded paths and must be updated:
+> - `group_vars/proxmox.yml` → `tf_output_path`
+> - `roles/guacamole_connection/defaults/main.yml` → `tf_output_path_root`
+> - `roles/guacamole_url/defaults/main.yml` → `tf_output_path_root`
+> - `roles/win_setup/defaults/main.yml` → `tf_output_path`
+> - `site.yml` → bootstrap lookup path
+> - `cleanup_ssh.yml`, `cleanup_vnc.yml`, `cleanup_win.yml` → lookup path
+>
+> **2. Set your SSH private key**
+> All inventory entries use `ansible_ssh_private_key_file`. Replace `<YOUR_SSH_KEY>` with the absolute path to your private key:
+> ```ini
+> ansible_ssh_private_key_file=/home/<YOUR_USER>/.ssh/<YOUR_KEY>
+> ```
+> This applies to: `inventory.ini` (proxmox, nat, masters, workers entries) and `inventory-exam.ini`.
+>
+> **3. Install requirements**
+> ```bash
+> # Install the required Ansible collection (Guacamole API)
+> ansible-galaxy collection install scicore.guacamole
+>
+> # Install Python dependencies (if needed)
+> pip install requests
+> ```
+
+---
+
 ## Directory Structure
 
 ```
