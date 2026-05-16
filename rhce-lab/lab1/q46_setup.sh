@@ -4,24 +4,22 @@ lang="${1:-en}"
 
 case "$lang" in
   en)
-    question="In modern RHEL/CentOS systems, the Ansible package was split. Which package name should you install to get the core Ansible engine and the \`ansible\` command?"
-    hint="The old \`ansible\` package became \`ansible-core\` starting from Ansible 2.10. The \`ansible\` package now refers to a larger community collection bundle."
-    instructions='[{"instruction": "To install the core Ansible engine on RHEL/CentOS, use", "command": "sudo yum install ansible-core"}]'
-    answer_a="ansible-core"
-    answer_b="ansible"
-    answer_c="ansible-base"
-    answer_d="ansible-engine"
-    # change to a quizz
-    
+    question="Which command shows the installed Ansible version?"
+    hint="This command also displays the Python version and the config file path in use."
+    instructions='[{"instruction": "Try it on the control node:", "command": "ansible --version"}]'
+    answer_a="ansible --version"
+    answer_b="ansible -v"
+    answer_c="ansible version"
+    answer_d="ansible --check"
     ;;
   fr)
-    question="Sur les systèmes RHEL/CentOS modernes, le paquet Ansible a été divisé. Quel nom de paquet faut-il installer pour obtenir le moteur Ansible et la commande \`ansible\` ?"
-    hint="L'ancien paquet \`ansible\` est devenu \`ansible-core\` à partir d'Ansible 2.10. Le paquet \`ansible\` désigne désormais un bundle de collections communautaires plus large."
-    instructions='[{"instruction": "Pour installer le moteur Ansible sur RHEL/CentOS, utilisez", "command": "sudo yum install ansible-core"}]'
-    answer_a="ansible-core"
-    answer_b="ansible"
-    answer_c="ansible-base"
-    answer_d="ansible-engine"
+    question="Quelle commande affiche la version d'Ansible installée ?"
+    hint="Cette commande affiche aussi la version de Python et le chemin du fichier de configuration utilisé."
+    instructions='[{"instruction": "Essayez-le sur le nœud de contrôle :", "command": "ansible --version"}]'
+    answer_a="ansible --version"
+    answer_b="ansible -v"
+    answer_c="ansible version"
+    answer_d="ansible --check"
     ;;
   *)
     echo "Error: Unsupported language '$lang'. Use en or fr." >&2
@@ -40,12 +38,12 @@ jq -n --indent 4 \
   --arg shuffled "$shuffled_answers" \
   '{
     "question": $question,
-    "type": "multi",
+    "type": "quiz",
     "answers": ($shuffled | split(",") | map(split(":") | {(.[0] | ltrimstr("\"") | rtrimstr("\"")): (.[1] | ltrimstr("\"") | rtrimstr("\""))}) | add),
     "hint": $hint,
     "instructions": $instructions,
     "solution": $solution,
     "plateforme_required": "container",
     "os_required": "ubuntu",
-    "tags": "ansible,rhce"
+    "tags": "ansible,rhce,beginner"
   }'
