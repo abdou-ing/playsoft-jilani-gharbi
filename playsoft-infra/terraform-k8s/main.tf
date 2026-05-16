@@ -32,6 +32,18 @@ module "vnc_server" {
   template_id = var.template_id
 }
 
+module "ssh_server" {
+  count  = var.ssh_server_count
+  source = "./modules/ssh-server"
+  vm_id  = 501 + count.index
+
+  node_name          = var.node_name
+  template_id        = var.template_id
+  cloud_init_snippet = templatefile("${path.module}/cloud-init/ssh-server.yaml", {
+    ssh_server_script = file("${path.module}/cloud-init/ssh-server.sh")
+  })
+}
+
 module "windows_vm" {
   source = "./modules/windows-vm"
 

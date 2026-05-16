@@ -6,13 +6,12 @@ variable "vm_id" {
   type = number
 }
 
-variable "server_count" {
-  type    = number
-  default = 1
-}
-
 variable "template_id" {
   type = number
+}
+
+variable "cloud_init_snippet" {
+  type = string
 }
 
 variable "cloud_init_datastore_id" {

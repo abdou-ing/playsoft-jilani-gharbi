@@ -5,7 +5,7 @@
 
 - name: Derive VM lists
   set_fact:
-    linux_vm_ids_list: "{{ (tf.vnc_vm_ids.value | flatten) if (tf.vnc_vm_ids is defined and tf.vnc_vm_ids.value is defined) else [] }}"
+    linux_vm_ids_list: "{{ ((tf.vnc_vm_ids.value | default([]) | flatten) + (tf.ssh_vm_ids.value | default([]) | flatten)) | unique }}"
     windows_vm_ids_list: "{{ (tf.windows_vm_ids.value | flatten) if (tf.windows_vm_ids is defined and tf.windows_vm_ids.value is defined) else [] }}"
 
 - name: Derive candidate count across enabled connection types
@@ -43,11 +43,10 @@
           'name': connection_prefix ~ '-' ~ (idx + 1) ~ '-ssh',
           'protocol': 'ssh',
           'hostname': vnc_hostname,
-          'port': (ssh_base_port | int + (item | int - 200)) | string,
+          'port': (ssh_base_port | int + (item | int - 400)) | string,
           'username_idx': idx,
           'parameters': {
-            'username': ssh_user,
-            'password': ssh_password
+            'username': ssh_user
           }
         }]
       }}
@@ -135,7 +134,6 @@
     hostname: "{{ item.hostname }}"
     port: "{{ item.port }}"
     username: "{{ item.parameters.username }}"
-    password: "{{ item.parameters.password }}"
     max_connections: "{{ max_connections_per_user }}"
   loop: "{{ guac_ssh_connections | default([]) }}"
   loop_control:

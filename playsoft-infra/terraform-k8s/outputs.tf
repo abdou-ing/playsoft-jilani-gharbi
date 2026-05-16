@@ -18,6 +18,14 @@ output "vnc_vm_ips" {
   value = [for server in module.vnc_server : server.primary_ipv4_address]
 }
 
+output "ssh_vm_ids" {
+  value = module.ssh_server[*].vm_ids
+}
+
+output "ssh_vm_ips" {
+  value = [for server in module.ssh_server : server.primary_ipv4_address]
+}
+
 output "windows_vm_ids" {
   value = module.windows_vm.vm_ids
 }

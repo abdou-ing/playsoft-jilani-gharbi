@@ -5,7 +5,7 @@
 
 - name: Derive VM lists
   set_fact:
-    linux_vm_ids_list: "{{ (tf.vnc_vm_ids.value | flatten) if (tf.vnc_vm_ids is defined and tf.vnc_vm_ids.value is defined) else [] }}"
+    linux_vm_ids_list: "{{ ((tf.vnc_vm_ids.value | default([]) | flatten) + (tf.ssh_vm_ids.value | default([]) | flatten)) | unique }}"
     windows_vm_ids_list: "{{ (tf.windows_vm_ids.value | flatten) if (tf.windows_vm_ids is defined and tf.windows_vm_ids.value is defined) else [] }}"
 
 - name: Derive candidate count across enabled connection types

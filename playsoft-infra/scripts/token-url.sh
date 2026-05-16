@@ -1,13 +1,4 @@
 #!/bin/bash
-# ─────────────────────────────────────────────────────────────────────────────
-# token-url.sh — Print Guacamole access URLs for a single user across all nodes
-#
-# Output:
-#   ══ candidat1 ════════════════════════════════════════════
-#   Homepage:                  http://<IP>/guacamole/?token=<TOKEN>#/
-#   VNC (exam-rhce-node1):     http://<IP>/guacamole/#/client/<ID>?token=<TOKEN>
-#   VNC (exam-rhce-node2):     http://<IP>/guacamole/#/client/<ID>?token=<TOKEN>
-# ─────────────────────────────────────────────────────────────────────────────
 
 PROJECT_ROOT="/home/jilani/playsoft-jilani-gharbi/playsoft-infra"
 TF_OUTPUT="${PROJECT_ROOT}/terraform-k8s/tf_output.json"
@@ -45,6 +36,7 @@ IS_WIN=$(echo "${CONN_TYPES}" | grep -q "win" && echo "true" || echo "false")
 
 # ── VM counts from Terraform ──────────────────────────────────────────────────
 VNC_VM_COUNT=$(jq -r '.vnc_vm_ids.value | length' "${TF_OUTPUT}")
+SSH_VM_COUNT=$(jq -r '.ssh_vm_ids.value | length' "${TF_OUTPUT}")
 WIN_VM_COUNT=$(jq -r '.windows_vm_ids.value | length' "${TF_OUTPUT}")
 
 # ── Admin token ───────────────────────────────────────────────────────────────
@@ -81,6 +73,12 @@ TOKEN=$(curl -s -X POST "${GUAC_URL}/api/tokens" \
 
 echo "Obtained token for ${USERNAME}: ${TOKEN}"
 
+# ── Count total connections for this user ─────────────────────────────────────
+TOTAL_SESSIONS=0
+[ "${IS_VNC}" = "true" ] && TOTAL_SESSIONS=$((TOTAL_SESSIONS + VNC_VM_COUNT))
+[ "${IS_SSH}" = "true" ] && TOTAL_SESSIONS=$((TOTAL_SESSIONS + SSH_VM_COUNT))
+[ "${IS_WIN}" = "true" ] && TOTAL_SESSIONS=$((TOTAL_SESSIONS + WIN_VM_COUNT))
+
 # ── Print access summary ──────────────────────────────────────────────────────
 echo ""
 echo "------------------------------------------------"
@@ -89,29 +87,34 @@ echo "------------------------------------------------"
 echo "Homepage:               ${GUAC_URL}/?token=${TOKEN}#/"
 echo "------------------------------------------------"
 
-# Loop over all VNC VMs — each becomes a node session for this user
+if [ "${TOTAL_SESSIONS}" -gt 2 ]; then
+  echo "Sessions:"
+fi
+
 if [ "${IS_VNC}" = "true" ]; then
   for i in $(seq 1 "${VNC_VM_COUNT}"); do
     NODE_NAME="${NODE_PREFIX}${i}"
     CONN_NAME="${CONN_PREFIX}-${i}-vnc"
     CID=$(get_conn_id "${CONN_NAME}")
-    if [ ! -z "${CID}" ] && [ "${CID}" != "null" ]; then
+    if [ -n "${CID}" ] && [ "${CID}" != "null" ]; then
       CLIENT_ID=$(generate_client_id "${CID}")
-      echo "VNC (${NODE_NAME}):     ${GUAC_URL}/#/client/${CLIENT_ID}?token=${TOKEN}"
+      echo "  VNC (${NODE_NAME}):   ${GUAC_URL}/#/client/${CLIENT_ID}?token=${TOKEN}"
     else
-      echo "VNC (${NODE_NAME}):     [connection '${CONN_NAME}' not found]"
+      echo "  VNC (${NODE_NAME}):   [connection '${CONN_NAME}' not found]"
     fi
   done
 fi
 
 if [ "${IS_SSH}" = "true" ]; then
-  for i in $(seq 1 "${VNC_VM_COUNT}"); do
+  for i in $(seq 1 "${SSH_VM_COUNT}"); do
     NODE_NAME="${NODE_PREFIX}${i}"
     CONN_NAME="${CONN_PREFIX}-${i}-ssh"
     CID=$(get_conn_id "${CONN_NAME}")
-    if [ ! -z "${CID}" ] && [ "${CID}" != "null" ]; then
+    if [ -n "${CID}" ] && [ "${CID}" != "null" ]; then
       CLIENT_ID=$(generate_client_id "${CID}")
-      echo "SSH (${NODE_NAME}):     ${GUAC_URL}/#/client/${CLIENT_ID}?token=${TOKEN}"
+      echo "  SSH (${NODE_NAME}):   ${GUAC_URL}/#/client/${CLIENT_ID}?token=${TOKEN}"
+    else
+      echo "  SSH (${NODE_NAME}):   [connection '${CONN_NAME}' not found]"
     fi
   done
 fi
@@ -121,9 +124,11 @@ if [ "${IS_WIN}" = "true" ]; then
     NODE_NAME="${NODE_PREFIX}${i}"
     CONN_NAME="${CONN_PREFIX}-${i}-win"
     CID=$(get_conn_id "${CONN_NAME}")
-    if [ ! -z "${CID}" ] && [ "${CID}" != "null" ]; then
+    if [ -n "${CID}" ] && [ "${CID}" != "null" ]; then
       CLIENT_ID=$(generate_client_id "${CID}")
-      echo "RDP (${NODE_NAME}):     ${GUAC_URL}/#/client/${CLIENT_ID}?token=${TOKEN}"
+      echo "  RDP (${NODE_NAME}):   ${GUAC_URL}/#/client/${CLIENT_ID}?token=${TOKEN}"
+    else
+      echo "  RDP (${NODE_NAME}):   [connection '${CONN_NAME}' not found]"
     fi
   done
 fi

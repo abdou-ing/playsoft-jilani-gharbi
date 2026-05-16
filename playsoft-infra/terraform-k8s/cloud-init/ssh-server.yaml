@@ -1,0 +1,12 @@
+#cloud-config
+write_files:
+  - path: /usr/local/bin/ssh-server.sh
+    owner: root:root
+    permissions: '0755'
+    content: |
+%{ for line in split("\n", chomp(ssh_server_script)) ~}
+      ${line}
+%{ endfor ~}
+
+runcmd:
+  - /usr/local/bin/ssh-server.sh

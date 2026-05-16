@@ -13,28 +13,27 @@ auth_password: guacadmin
 # ─────────────────────────────────────────────────────────────
 # Template config for auto-generated users.
 # ─────────────────────────────────────────────────────────────
-user_prefix: "candidat"
-user_password_prefix: "candidat"
+user_prefix: "jilani"
+user_password_prefix: "alphabeta123"
 user_organization: "playsoft"
 user_email_domain: "example.com"
 
-connection_prefix: "exam"
+connection_prefix: "rhce-lab-test"
 vnc_hostname: "138.201.200.168"
-vnc_base_port: 5930       # port = vnc_base_port + index (1-based)
+vnc_base_port: 5915       # port = vnc_base_port + index (1-based)
 win_rdp_base_port: 3310   # port = win_rdp_base_port + index (0-based)
-ssh_base_port: 2200       # port = ssh_base_port + (vmid - 200)
+ssh_base_port: 4010       # port = ssh_base_port + (vmid - 200)
 rdp_ignore_server_certs: true
 
 
 ssh_user: "student"
-ssh_password: "student"
 
 win_user: "student"
 win_password: "123456"
 
 connection_type:
-  # - "vnc"
-   - "ssh"
+  #- "vnc"
+    - "ssh"
   #- "win"
 
 # ─────────────────────────────────────────────────────────────

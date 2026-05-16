@@ -39,6 +39,12 @@ variable "vnc_server_count" {
   type        = number
 }
 
+variable "ssh_server_count" {
+  description = "Number of SSH servers"
+  type        = number
+  default     = 0
+}
+
 variable "proxmox_api_url" {
   type = string
 }
