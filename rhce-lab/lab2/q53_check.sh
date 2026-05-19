@@ -11,7 +11,7 @@ lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 declare -A messages_en=(
-  ["no_playbook"]="Playbook ~/playbooks/users.yml not found. Create it first."
+  ["no_playbook"]="Playbook /home/ansible_user/playbooks/users.yml not found. Create it first."
   ["syntax_error"]="Playbook has syntax errors. Run: ansible-playbook --syntax-check playbooks/users.yml"
   # alice checks
   ["alice_missing"]="User alice does not exist on all hosts. Run: ansible-playbook playbooks/users.yml"
@@ -24,7 +24,7 @@ declare -A messages_en=(
   ["bob_home"]="User bob does not have home /home/bob on all hosts. Check the 'home' parameter in your playbook."
 )
 declare -A messages_fr=(
-  ["no_playbook"]="Le playbook ~/playbooks/users.yml est introuvable. Créez-le d'abord."
+  ["no_playbook"]="Le playbook /home/ansible_user/playbooks/users.yml est introuvable. Créez-le d'abord."
   ["syntax_error"]="Le playbook contient des erreurs de syntaxe. Exécutez : ansible-playbook --syntax-check playbooks/users.yml"
   ["alice_missing"]="L'utilisateur alice n'existe pas sur tous les hôtes. Exécutez : ansible-playbook playbooks/users.yml"
   ["alice_shell"]="L'utilisateur alice n'a pas le shell /bin/bash sur tous les hôtes. Vérifiez le paramètre 'shell' dans votre playbook."
@@ -35,7 +35,7 @@ declare -A messages_fr=(
   ["bob_home"]="L'utilisateur bob n'a pas le home /home/bob sur tous les hôtes. Vérifiez le paramètre 'home' dans votre playbook."
 )
 
-get_message() { declare -n _m="messages_$lang"; echo "{\"result\": \"${_m[$1]}\"}"; }
+
 
 cd /home/ansible_user
 

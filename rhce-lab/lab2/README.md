@@ -117,18 +117,18 @@ bash lab2/q7_check.sh debug fr
 
 ## Candidate Playbook Locations
 
-All playbooks must be created inside `~/playbooks/` (i.e. `/home/ansible_user/playbooks/`) on `control-node`:
+All playbooks must be created inside `/home/ansible_user/playbooks/` (i.e. `/home/ansible_user/playbooks/`) on `control-node`:
 
 | Question | Playbook path |
 |----------|---------------|
-| Q2 | `~/playbooks/users.yml` |
-| Q3 | `~/playbooks/remove_user.yml` |
-| Q4 | `~/playbooks/webserver.yml` |
-| Q5 | `~/playbooks/add_hosts.yml` |
-| Q6 | `~/playbooks/copy_file.yml` |
-| Q7 | `~/playbooks/create_backup.yml` |
+| Q2 | `/home/ansible_user/playbooks/users.yml` |
+| Q3 | `/home/ansible_user/playbooks/remove_user.yml` |
+| Q4 | `/home/ansible_user/playbooks/webserver.yml` |
+| Q5 | `/home/ansible_user/playbooks/add_hosts.yml` |
+| Q6 | `/home/ansible_user/playbooks/copy_file.yml` |
+| Q7 | `/home/ansible_user/playbooks/create_backup.yml` |
 
-The file `~/playbooks/config.json` is pre-created by `lab2_env_setup.sh` and used as the source file for Q6.
+The file `/home/ansible_user/playbooks/config.json` is pre-created by `lab2_env_setup.sh` and used as the source file for Q6.
 
 ## End-to-End Test Sequence
 

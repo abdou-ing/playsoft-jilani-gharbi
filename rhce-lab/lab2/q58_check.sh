@@ -11,7 +11,7 @@ lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 declare -A messages_en=(
-  ["no_playbook"]="Playbook ~/playbooks/create_backup.yml not found. Create it first."
+  ["no_playbook"]="Playbook /home/ansible_user/playbooks/create_backup.yml not found. Create it first."
   ["syntax_error"]="Playbook has syntax errors. Run: ansible-playbook --syntax-check playbooks/create_backup.yml"
   # /backup does not exist at all
   ["dir_missing"]="Directory /backup does not exist on all managed hosts. Run: ansible-playbook playbooks/create_backup.yml"
@@ -25,7 +25,7 @@ declare -A messages_en=(
   ["wrong_group"]="Directory /backup does not have group root on all hosts. Set group: root in your file task."
 )
 declare -A messages_fr=(
-  ["no_playbook"]="Le playbook ~/playbooks/create_backup.yml est introuvable. Créez-le d'abord."
+  ["no_playbook"]="Le playbook /home/ansible_user/playbooks/create_backup.yml est introuvable. Créez-le d'abord."
   ["syntax_error"]="Le playbook contient des erreurs de syntaxe. Exécutez : ansible-playbook --syntax-check playbooks/create_backup.yml"
   ["dir_missing"]="Le répertoire /backup n'existe pas sur tous les hôtes gérés. Exécutez : ansible-playbook playbooks/create_backup.yml"
   ["not_a_dir"]="/backup existe mais est un fichier, pas un répertoire. Utilisez le module file avec state: directory."
@@ -34,7 +34,7 @@ declare -A messages_fr=(
   ["wrong_group"]="Le répertoire /backup n'a pas le groupe root sur tous les hôtes. Définissez group: root dans votre tâche file."
 )
 
-get_message() { declare -n _m="messages_$lang"; echo "{\"result\": \"${_m[$1]}\"}"; }
+
 
 cd /home/ansible_user
 

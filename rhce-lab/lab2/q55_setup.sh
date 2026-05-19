@@ -4,59 +4,66 @@ lang="${1:-en}"
 
 case "$lang" in
   en)
-    question="Write a multi-play playbook at \`~/playbooks/webserver.yml\`: (1) install \`apache2\` on \`webservers1\`, (2) verify installation on all hosts using the \`command\` module with \`dpkg -l apache2\`, (3) start and enable the \`apache2\` service on \`webservers1\`."
-    hint="Use \`apt\` module to install, \`command\` module to verify, and \`service\` module to manage the service. Each play targets a different host group."
-    inst1="Create the playbook at ~/playbooks/webserver.yml:"
-    inst2="Check syntax then run the playbook:"
+    question="Write a multi-play playbook at \`/home/ansible_user/playbooks/webserver.yml\`: (1) install \`apache2\` on \`webservers\`, (2) install \`vim\` on all managed nodes."
+    hint="Use the \`ansible.builtin.apt\` module to install packages. Each play targets a different host group."
+    inst1="Create the playbook at /home/ansible_user/playbooks/webserver.yml:"
+    inst2="Check the playbook syntax:"
+    inst3="Run the playbook:"
     ;;
   fr)
-    question="Écrivez un playbook multi-play dans \`~/playbooks/webserver.yml\` : (1) installez \`apache2\` sur \`webservers1\`, (2) vérifiez l'installation sur tous les hôtes avec le module \`command\` en utilisant \`dpkg -l apache2\`, (3) démarrez et activez le service \`apache2\` sur \`webservers1\`."
-    hint="Utilisez le module \`apt\` pour installer, le module \`command\` pour vérifier, et le module \`service\` pour gérer le service. Chaque play cible un groupe d'hôtes différent."
-    inst1="Créez le playbook dans ~/playbooks/webserver.yml :"
-    inst2="Vérifiez la syntaxe puis exécutez le playbook :"
+    question="Écrivez un playbook multi-play dans \`/home/ansible_user/playbooks/webserver.yml\` : (1) installez \`apache2\` sur \`webservers\`, (2) installez \`vim\` sur toutes les machines hôtes."
+    hint="Utilisez le module \`ansible.builtin.apt\` pour installer les paquets. Chaque play cible un groupe d'hôtes différent."
+    inst1="Créez le playbook dans /home/ansible_user/playbooks/webserver.yml :"
+    inst2="Vérifiez la syntaxe du playbook :"
+    inst3="Exécutez le playbook :"
     ;;
   *)
     echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
 esac
 
 cmd_playbook='```yaml
-- name: Install apache2 on webservers1
-  hosts: webservers1
+- name: Install apache2 on webservers
+  hosts: webservers
   become: true
   tasks:
+    - name: Update apt-get repo and cache
+      ansible.builtin.apt: 
+        update_cache: yes 
+        cache_valid_time: 3600
     - name: Install apache2
-      apt:
+      ansible.builtin.apt:
         name: apache2
         state: present
-
-- name: Verify apache2 on all hosts
+    - name: Make sure apache service unit is running and enabled
+      ansible.builtin.service:
+        state: started
+        enabled: true
+        name: apache2
+      
+- name: Install vim on all managed hosts
   hosts: all
   become: true
   tasks:
-    - name: Verify apache2 installation
-      command: dpkg -l apache2
+    - name: Install vim
+      ansible.builtin.package:
+        name: vim
+        state: present
+```'
 
-- name: Start and enable apache2 on webservers1
-  hosts: webservers1
-  become: true
-  tasks:
-    - name: Start and enable apache2
-      service:
-        name: apache2
-        state: started
-        enabled: yes
+cmd_check='```bash
+ansible-playbook --syntax-check /home/ansible_user/playbooks/webserver.yml
 ```'
 
 cmd_run='```bash
-ansible-playbook --syntax-check playbooks/webserver.yml
-ansible-playbook playbooks/webserver.yml
+ansible-playbook /home/ansible_user/playbooks/webserver.yml
 ```'
 
 instructions=$(jq -n \
   --arg inst1 "$inst1" --arg cmd1 "$cmd_playbook" \
-  --arg inst2 "$inst2" --arg cmd2 "$cmd_run" \
-  '[{"instruction": $inst1, "command": $cmd1}, {"instruction": $inst2, "command": $cmd2}]')
+  --arg inst2 "$inst2" --arg cmd2 "$cmd_check" \
+  --arg inst3 "$inst3" --arg cmd3 "$cmd_run" \
+  '[{"instruction": $inst1, "command": $cmd1}, {"instruction": $inst2, "command": $cmd2}, {"instruction": $inst3, "command": $cmd3}]')
 
 jq -n --indent 4 \
   --arg question "$question" --arg hint "$hint" --argjson instructions "$instructions" \
-  '{"question": $question, "plateforme_required": "container", "os_required": "ubuntu", "type": "button", "hint": $hint, "instructions": $instructions, "text": "Check", "tags": "ansible,rhce,playbook,apache2,service"}'
+  '{"question": $question, "plateforme_required": "container", "os_required": "ubuntu", "type": "button", "hint": $hint, "instructions": $instructions, "text": "Check", "tags": "ansible,rhce,playbook,apache2,vim"}'

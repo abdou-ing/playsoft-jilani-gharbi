@@ -1,0 +1,87 @@
+version: '3'
+services:
+  control-node:
+    image: docker.io/abdou777/ansible-ubuntu-controller:1.0
+    container_name: control-node
+    hostname: control-node
+    depends_on:
+      - web1
+      - web2
+    networks:
+      - ansible-net
+    #volumes:
+    #  - ./ssh:/home/ansible_user/.ssh:Z  # SELinux relabeling
+    #  - ./playbooks:/home/ansible_user/playbooks:Z
+    environment:
+      - ANSIBLE_HOST_KEY_CHECKING=false  # Enable host key checking
+    command: >
+      /bin/bash -c "
+      getent hosts web1 | awk '{print \$1, "web1"}' | tail -n 1 | sudo tee -a /etc/hosts &&
+      getent hosts web2 | awk '{print $1, "web2"}' | tail -n 1 | sudo tee -a /etc/hosts &&
+      getent hosts db1 | awk '{print $1, "db1"}'   | tail -n 1 | sudo tee -a /etc/hosts &&
+      echo '[webservers]' > /etc/ansible/hosts &&
+      echo 'web1' >> /etc/ansible/hosts &&
+      echo 'web2' >> /etc/ansible/hosts &&
+      echo '[dbservers]' >> /etc/ansible/hosts &&
+      echo 'db1' >> /etc/ansible/hosts &&
+      sudo service ssh start &&
+      sleep infinity"
+    tty: true
+    user: ansible_user
+    privileged: true
+
+  web1:
+    image: docker.io/abdou777/ansible-ubuntu-client:1.0
+    container_name: web1
+    hostname: web1
+    networks:
+      - ansible-net
+    #volumes:
+    #  - ./ssh:/home/ansible_user/.ssh:Z
+    command: >
+      /bin/bash -c "
+      sudo service ssh start &&
+      sleep infinity"
+    tty: true
+    user: ansible_user
+    privileged: true
+
+  web2:
+    image: docker.io/abdou777/ansible-ubuntu-client:1.0
+    container_name: web2
+    hostname: web2
+    networks:
+      - ansible-net
+    #volumes:
+    #  - ./ssh:/home/ansible_user/.ssh:Z
+    command: >
+      /bin/bash -c "
+      sudo service ssh start &&
+      sleep infinity"
+    tty: true
+    user: ansible_user
+    privileged: true
+
+  db1:
+    image: abdou777/ansible-centos-client:1.0
+    container_name: db1
+    hostname: db1
+    networks:
+      - ansible-net
+    #volumes:
+    #  - ./ssh:/home/ansible_user/.ssh:Z
+    command: >
+      /bin/bash -c "
+      sudo rm -f /etc/nologin /run/nologin &&
+      sudo ssh-keygen -A &&
+      sudo /usr/sbin/sshd &&
+      sleep infinity
+      "
+    tty: true
+    init: true
+    user: ansible_user
+    privileged: true
+
+networks:
+  ansible-net:
+    driver: bridge

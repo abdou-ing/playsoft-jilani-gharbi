@@ -11,9 +11,9 @@ lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 declare -A messages_en=(
-  ["no_playbook"]="Playbook ~/playbooks/copy_file.yml not found. Create it first."
+  ["no_playbook"]="Playbook /home/ansible_user/playbooks/copy_file.yml not found. Create it first."
   ["syntax_error"]="Playbook has syntax errors. Run: ansible-playbook --syntax-check playbooks/copy_file.yml"
-  ["no_source"]="Source file ~/playbooks/config.json not found on control-node. It should have been pre-created — check with: ls ~/playbooks/config.json"
+  ["no_source"]="Source file /home/ansible_user/playbooks/config.json not found on control-node. It should have been pre-created — check with: ls /home/ansible_user/playbooks/config.json"
   # /etc/myapp directory not created
   ["dir_missing"]="/etc/myapp directory does not exist on all hosts. Add a 'file' task with state: directory before copying."
   # file copied to wrong path
@@ -22,15 +22,15 @@ declare -A messages_en=(
   ["not_a_dir"]="/etc/myapp exists but is a file, not a directory. Remove it and recreate with state: directory."
 )
 declare -A messages_fr=(
-  ["no_playbook"]="Le playbook ~/playbooks/copy_file.yml est introuvable. Créez-le d'abord."
+  ["no_playbook"]="Le playbook /home/ansible_user/playbooks/copy_file.yml est introuvable. Créez-le d'abord."
   ["syntax_error"]="Le playbook contient des erreurs de syntaxe. Exécutez : ansible-playbook --syntax-check playbooks/copy_file.yml"
-  ["no_source"]="Le fichier source ~/playbooks/config.json est introuvable sur le control-node. Il aurait dû être pré-créé — vérifiez avec : ls ~/playbooks/config.json"
+  ["no_source"]="Le fichier source /home/ansible_user/playbooks/config.json est introuvable sur le control-node. Il aurait dû être pré-créé — vérifiez avec : ls /home/ansible_user/playbooks/config.json"
   ["dir_missing"]="Le répertoire /etc/myapp n'existe pas sur tous les hôtes. Ajoutez une tâche 'file' avec state: directory avant la copie."
   ["wrong_dest"]="config.json n'a pas été trouvé dans /etc/myapp/config.json sur tous les hôtes. Vérifiez le paramètre 'dest' dans votre tâche copy."
   ["not_a_dir"]="/etc/myapp existe mais est un fichier, pas un répertoire. Supprimez-le et recréez-le avec state: directory."
 )
 
-get_message() { declare -n _m="messages_$lang"; echo "{\"result\": \"${_m[$1]}\"}"; }
+
 
 cd /home/ansible_user
 

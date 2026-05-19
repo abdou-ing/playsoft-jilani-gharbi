@@ -11,7 +11,7 @@ lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 declare -A messages_en=(
-  ["no_playbook"]="Playbook ~/playbooks/remove_user.yml not found. Create it first."
+  ["no_playbook"]="Playbook /home/ansible_user/playbooks/remove_user.yml not found. Create it first."
   ["syntax_error"]="Playbook has syntax errors. Run: ansible-playbook --syntax-check playbooks/remove_user.yml"
   # charlie still exists (account not removed)
   ["charlie_exists"]="User charlie still exists on all hosts. Run: ansible-playbook playbooks/remove_user.yml"
@@ -19,13 +19,13 @@ declare -A messages_en=(
   ["charlie_home_exists"]="User charlie was removed but home directory /home/charlie still exists. Add 'remove_home: true' to the user module."
 )
 declare -A messages_fr=(
-  ["no_playbook"]="Le playbook ~/playbooks/remove_user.yml est introuvable. Créez-le d'abord."
+  ["no_playbook"]="Le playbook /home/ansible_user/playbooks/remove_user.yml est introuvable. Créez-le d'abord."
   ["syntax_error"]="Le playbook contient des erreurs de syntaxe. Exécutez : ansible-playbook --syntax-check playbooks/remove_user.yml"
   ["charlie_exists"]="L'utilisateur charlie existe encore sur tous les hôtes. Exécutez : ansible-playbook playbooks/remove_user.yml"
   ["charlie_home_exists"]="L'utilisateur charlie a été supprimé mais le répertoire /home/charlie existe encore. Ajoutez 'remove_home: true' au module user."
 )
 
-get_message() { declare -n _m="messages_$lang"; echo "{\"result\": \"${_m[$1]}\"}"; }
+
 
 cd /home/ansible_user
 

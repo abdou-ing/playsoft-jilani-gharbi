@@ -11,47 +11,41 @@ lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 declare -A messages_en=(
-  ["no_playbook"]="Playbook ~/playbooks/add_hosts.yml not found. Create it first."
-  ["syntax_error"]="Playbook has syntax errors. Run: ansible-playbook --syntax-check playbooks/add_hosts.yml"
-  # entry completely missing
-  ["entry_missing"]="Entry '10.0.0.1 myserver' not found in /etc/hosts on all hosts. Run: ansible-playbook playbooks/add_hosts.yml"
-  # wrong IP used (e.g. 127.0.0.1 myserver)
-  ["wrong_ip"]="'myserver' entry found in /etc/hosts but with wrong IP. Expected: 10.0.0.1 myserver"
-  # entry duplicated (lineinfile without line param makes it non-idempotent)
-  ["entry_duplicate"]="Entry '10.0.0.1 myserver' appears more than once in /etc/hosts. Use the lineinfile module with the 'line' parameter to ensure idempotency."
+  ["no_playbook"]="Playbook /home/ansible_user/playbooks/deploy_webapp.yml not found. Create it first."
+  ["syntax_error"]="Playbook has syntax errors. Run: ansible-playbook --syntax-check playbooks/deploy_webapp.yml"
+  ["no_git_module"]="Playbook does not use the ansible.builtin.git module. Use it to clone the repository directly on webservers."
+  ["repo_not_cloned"]="Repository not cloned at /var/www/html on webservers. Run: ansible-playbook playbooks/deploy_webapp.yml"
+  ["wrong_repo"]="A git repository exists at /var/www/html on webservers but the remote URL does not match the expected repository."
 )
 declare -A messages_fr=(
-  ["no_playbook"]="Le playbook ~/playbooks/add_hosts.yml est introuvable. Créez-le d'abord."
-  ["syntax_error"]="Le playbook contient des erreurs de syntaxe. Exécutez : ansible-playbook --syntax-check playbooks/add_hosts.yml"
-  ["entry_missing"]="L'entrée '10.0.0.1 myserver' est absente de /etc/hosts sur tous les hôtes. Exécutez : ansible-playbook playbooks/add_hosts.yml"
-  ["wrong_ip"]="L'entrée 'myserver' existe dans /etc/hosts mais avec une mauvaise IP. Attendu : 10.0.0.1 myserver"
-  ["entry_duplicate"]="L'entrée '10.0.0.1 myserver' apparaît plus d'une fois dans /etc/hosts. Utilisez le module lineinfile avec le paramètre 'line' pour garantir l'idempotence."
+  ["no_playbook"]="Le playbook /home/ansible_user/playbooks/deploy_webapp.yml est introuvable. Créez-le d'abord."
+  ["syntax_error"]="Le playbook contient des erreurs de syntaxe. Exécutez : ansible-playbook --syntax-check playbooks/deploy_webapp.yml"
+  ["no_git_module"]="Le playbook n'utilise pas le module ansible.builtin.git. Utilisez-le pour cloner le dépôt directement sur les webservers."
+  ["repo_not_cloned"]="Le dépôt n'est pas cloné dans /var/www/html sur les webservers. Exécutez : ansible-playbook playbooks/deploy_webapp.yml"
+  ["wrong_repo"]="Un dépôt git existe dans /var/www/html sur les webservers mais l'URL distante ne correspond pas au dépôt attendu."
 )
 
-get_message() { declare -n _m="messages_$lang"; echo "{\"result\": \"${_m[$1]}\"}"; }
+
 
 cd /home/ansible_user
 
 # CHECK 1 — playbook file must exist
-[ -f "playbooks/add_hosts.yml" ] || { echo "$(get_message no_playbook)"; exit 0; }
+[ -f "playbooks/deploy_webapp.yml" ] || { echo "$(get_message no_playbook)"; exit 0; }
 
 # CHECK 2 — playbook must have no syntax errors
-ansible-playbook --syntax-check playbooks/add_hosts.yml &>/dev/null || { echo "$(get_message syntax_error)"; exit 0; }
+ansible-playbook --syntax-check playbooks/deploy_webapp.yml &>/dev/null || { echo "$(get_message syntax_error)"; exit 0; }
 
-# CHECK 3 — exact entry must exist in /etc/hosts on all hosts
-ansible all -m command -a "grep '10.0.0.1 myserver' /etc/hosts" &>/dev/null 2>&1 || {
-  # CHECK 3b — check if myserver exists but with wrong IP
-  if ansible all -m command -a "grep 'myserver' /etc/hosts" &>/dev/null 2>&1; then
-    echo "$(get_message wrong_ip)"; exit 0
-  fi
-  echo "$(get_message entry_missing)"; exit 0
-}
+# CHECK 3 — playbook must use ansible.builtin.git (or short alias 'git') module
+# (catches: candidate used copy/synchronize instead of git module)
+grep -qE '^\s+(ansible\.builtin\.git|git):' playbooks/deploy_webapp.yml || { echo "$(get_message no_git_module)"; exit 0; }
 
-# CHECK 4 — entry must appear exactly once (idempotency check)
-# (catches: candidate used lineinfile without 'line' param or ran playbook multiple times with append)
-count=$(ansible all -m command -a "grep -c '10.0.0.1 myserver' /etc/hosts" 2>/dev/null | grep -E '^[0-9]+$' | sort -rn | head -1)
-if [[ -n "$count" && "$count" -gt 1 ]]; then
-  echo "$(get_message entry_duplicate)"; exit 0
-fi
+# CHECK 4 — /var/www/html must be a git repo on webservers
+# (catches: playbook not run yet, or dest path wrong)
+ansible webservers -m command -a "test -d /var/www/html/.git" &>/dev/null 2>&1 || { echo "$(get_message repo_not_cloned)"; exit 0; }
+
+# CHECK 5 — remote origin must point to the expected repo
+# (catches: candidate cloned a different repo)
+ansible webservers -m command -a "git -C /var/www/html remote get-url origin" 2>/dev/null \
+  | grep -q "ansible-examples" || { echo "$(get_message wrong_repo)"; exit 0; }
 
 echo '{"result": "0"}'
