@@ -59,6 +59,12 @@ case "$lang" in
     echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
 esac
 
+# Handle the case user skipped adding pkg_name group variable (q90)
+if ! grep -q "pkg_name" /home/ansible_user/inventory 2>/dev/null; then
+  grep -q '\[webservers:vars\]' /home/ansible_user/inventory || printf '\n[webservers:vars]\n' >> /home/ansible_user/inventory
+  echo 'pkg_name=nginx' >> /home/ansible_user/inventory
+fi
+
 instructions=$(jq -n --arg inst1 "$inst1" --arg cmd1 "$cmd1" --arg inst2 "$inst2" --arg cmd2 "$cmd2" \
   '[{"instruction": $inst1, "command": $cmd1}, {"instruction": $inst2, "command": $cmd2}]')
 

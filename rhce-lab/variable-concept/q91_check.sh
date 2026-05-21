@@ -12,21 +12,6 @@ if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 pb_path="/home/ansible_user/debug_vars.yml"
 
-# SKIP: auto-create and run debug_vars.yml silently
-if [[ "$1" == "skip" ]]; then
-  cat > "$pb_path" <<'EOF'
----
-- name: print pkg_name variable
-  hosts: webservers
-  tasks:
-    - name: display pkg_name
-      debug:
-        var: pkg_name
-EOF
-  ansible-playbook "$pb_path" -q >/dev/null 2>&1
-  echo '{"result": "0"}'; exit 0
-fi
-
 declare -A messages_en=(
   ["no_file"]="Playbook not found at $pb_path. Create it first."
   ["no_webservers"]="The playbook does not target 'webservers'. Set hosts: webservers."

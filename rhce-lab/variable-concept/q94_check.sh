@@ -12,22 +12,6 @@ if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 pb_path="/home/ansible_user/create_file.yml"
 
-# SKIP: auto-create and run create_file.yml silently
-if [[ "$1" == "skip" ]]; then
-  cat > "$pb_path" <<'EOF'
----
-- name: create hello file
-  hosts: webservers
-  tasks:
-    - name: write hello.txt
-      copy:
-        content: "Hello from Ansible"
-        dest: /tmp/hello.txt
-EOF
-  ansible-playbook "$pb_path" -q >/dev/null 2>&1
-  echo '{"result": "0"}'; exit 0
-fi
-
 declare -A messages_en=(
   ["no_file"]="Playbook not found at $pb_path. Create it first."
   ["no_webservers"]="The playbook does not target 'webservers'. Set hosts: webservers."

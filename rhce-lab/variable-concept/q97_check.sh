@@ -12,16 +12,6 @@ if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 inventory_path="/home/ansible_user/inventory"
 
-# SKIP: auto-add env=staging to [webservers:vars] silently
-if [[ "$1" == "skip" ]]; then
-  if ! grep -q "^\[webservers:vars\]" "$inventory_path" 2>/dev/null; then
-    printf '\n[webservers:vars]\npkg_name=nginx\nenv=staging\n' >> "$inventory_path" 2>/dev/null
-  elif ! grep -q "^env=staging" "$inventory_path" 2>/dev/null; then
-    sed -i '/^\[webservers:vars\]/a env=staging' "$inventory_path" 2>/dev/null
-  fi
-  echo '{"result": "0"}'; exit 0
-fi
-
 declare -A messages_en=(
   ["no_file"]="Inventory file not found at $inventory_path."
   ["no_vars_section"]="The [webservers:vars] section is missing. Add it to $inventory_path."

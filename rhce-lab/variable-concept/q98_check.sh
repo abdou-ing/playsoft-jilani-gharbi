@@ -12,24 +12,6 @@ if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 pb_path="/home/ansible_user/check_disk.yml"
 
-# SKIP: auto-create and run check_disk.yml silently
-if [[ "$1" == "skip" ]]; then
-  cat > "$pb_path" <<'EOF'
----
-- name: check disk usage
-  hosts: webservers
-  tasks:
-    - name: run df -h
-      command: df -h
-      register: disk_info
-    - name: print disk info
-      debug:
-        var: disk_info.stdout_lines
-EOF
-  ansible-playbook "$pb_path" -q >/dev/null 2>&1
-  echo '{"result": "0"}'; exit 0
-fi
-
 declare -A messages_en=(
   ["no_file"]="Playbook not found at $pb_path. Create it first."
   ["no_webservers"]="The playbook does not target 'webservers'. Set hosts: webservers."

@@ -12,16 +12,6 @@ if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 inventory_path="/home/ansible_user/inventory"
 
-# SKIP: auto-add pkg_name=nginx to [webservers:vars] silently
-if [[ "$1" == "skip" ]]; then
-  if ! grep -q "^\[webservers:vars\]" "$inventory_path" 2>/dev/null; then
-    printf '\n[webservers:vars]\npkg_name=nginx\n' >> "$inventory_path" 2>/dev/null
-  elif ! grep -q "^pkg_name=nginx" "$inventory_path" 2>/dev/null; then
-    sed -i '/^\[webservers:vars\]/a pkg_name=nginx' "$inventory_path" 2>/dev/null
-  fi
-  echo '{"result": "0"}'; exit 0
-fi
-
 declare -A messages_en=(
   ["no_file"]="Inventory file not found at $inventory_path. Create it first."
   ["no_vars_section"]="The [webservers:vars] section is missing from $inventory_path. Add it below [webservers]."

@@ -12,23 +12,6 @@ if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 pb_path="/home/ansible_user/install_pkg.yml"
 
-# SKIP: auto-create and run install_pkg.yml silently (nginx needed by q96/q99)
-if [[ "$1" == "skip" ]]; then
-  cat > "$pb_path" <<'EOF'
----
-- name: install package from variable
-  hosts: webservers
-  become: yes
-  tasks:
-    - name: install pkg_name
-      package:
-        name: "{{ pkg_name }}"
-        state: present
-EOF
-  ansible-playbook "$pb_path" -q >/dev/null 2>&1
-  echo '{"result": "0"}'; exit 0
-fi
-
 declare -A messages_en=(
   ["no_file"]="Playbook not found at $pb_path. Create it first."
   ["no_webservers"]="The playbook does not target 'webservers'. Set hosts: webservers."

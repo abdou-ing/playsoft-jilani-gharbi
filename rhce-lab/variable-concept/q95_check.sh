@@ -12,22 +12,6 @@ if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 pb_path="/home/ansible_user/create_user.yml"
 
-# SKIP: auto-create and run create_user.yml silently
-if [[ "$1" == "skip" ]]; then
-  cat > "$pb_path" <<'EOF'
----
-- name: create devops user
-  hosts: webservers
-  become: yes
-  tasks:
-    - name: add user devops
-      user:
-        name: devops
-        state: present
-EOF
-  ansible-playbook "$pb_path" -q >/dev/null 2>&1
-  echo '{"result": "0"}'; exit 0
-fi
 
 declare -A messages_en=(
   ["no_file"]="Playbook not found at $pb_path. Create it first."

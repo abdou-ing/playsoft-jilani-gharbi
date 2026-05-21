@@ -12,32 +12,6 @@ if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 pb_path="/home/ansible_user/multi_task.yml"
 
-# SKIP: auto-create and run multi_task.yml silently (nginx running needed by q99)
-if [[ "$1" == "skip" ]]; then
-  cat > "$pb_path" <<'EOF'
----
-- name: full web server setup
-  hosts: webservers
-  become: yes
-  tasks:
-    - name: install package
-      package:
-        name: "{{ pkg_name }}"
-        state: present
-    - name: start and enable service
-      service:
-        name: "{{ pkg_name }}"
-        state: started
-        enabled: yes
-    - name: create index.html
-      copy:
-        content: "Welcome"
-        dest: /var/www/html/index.html
-EOF
-  ansible-playbook "$pb_path" -q >/dev/null 2>&1
-  echo '{"result": "0"}'; exit 0
-fi
-
 declare -A messages_en=(
   ["no_file"]="Playbook not found at $pb_path. Create it first."
   ["no_webservers"]="The playbook does not target 'webservers'. Set hosts: webservers."

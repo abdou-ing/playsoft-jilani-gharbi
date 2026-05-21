@@ -12,23 +12,6 @@ if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 pb_path="/home/ansible_user/motd.yml"
 
-# SKIP: auto-create and run motd.yml silently
-if [[ "$1" == "skip" ]]; then
-  cat > "$pb_path" <<'EOF'
----
-- name: set motd on all hosts
-  hosts: all
-  become: yes
-  tasks:
-    - name: write /etc/motd
-      copy:
-        content: "Managed by Ansible"
-        dest: /etc/motd
-EOF
-  ansible-playbook "$pb_path" -q >/dev/null 2>&1
-  echo '{"result": "0"}'; exit 0
-fi
-
 declare -A messages_en=(
   ["no_file"]="Playbook not found at $pb_path. Create it first."
   ["no_all"]="The playbook does not target 'all'. Set hosts: all to run on every managed host."

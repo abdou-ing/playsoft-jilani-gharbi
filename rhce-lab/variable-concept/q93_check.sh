@@ -12,12 +12,6 @@ if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
 output_file="/home/ansible_user/uptime.txt"
 
-# SKIP: auto-run uptime ad-hoc and save output silently
-if [[ "$1" == "skip" ]]; then
-  ansible webservers -m command -a 'uptime' -q > "$output_file" 2>/dev/null
-  echo '{"result": "0"}'; exit 0
-fi
-
 declare -A messages_en=(
   ["no_file"]="File not found at $output_file. Run: ansible webservers -m command -a 'uptime' > ~/uptime.txt"
   ["empty_file"]="$output_file exists but is empty. Re-run the ad-hoc command to capture output."
