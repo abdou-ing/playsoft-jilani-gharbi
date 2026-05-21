@@ -1,91 +1,76 @@
 #!/bin/bash
+if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
+lang="${1:-en}"
 
-# Check if "debug" is passed as an argument
-if [[ "$1" == "debug" ]]; then
-  set -eoux
-  shift
+pb_path="/home/ansible_user/workspace/when_demo.yml"
+inventory_path="/home/ansible_user/workspace/inventory"
+
+# Skip-q60 guard
+if [ ! -f "$inventory_path" ]; then
+  mkdir -p /home/ansible_user/workspace
+  printf '[webservers]\nweb1\nweb2\n\n[dbservers]\nbd1\n\n[all:vars]\nansible_user=ansible_user\n' \
+    > "$inventory_path"
+fi
+for entry in "10.30.0.11 web1" "10.30.0.12 web2" "10.30.0.13 bd1"; do
+  grep -qF "${entry%% *}" /etc/hosts 2>/dev/null || \
+    printf '%s\n' "$entry" | sudo tee -a /etc/hosts >/dev/null 2>&1 || true
+done
+if [ ! -f "/home/ansible_user/.ssh/id_rsa" ]; then
+  ssh-keygen -t rsa -b 2048 -f /home/ansible_user/.ssh/id_rsa -N "" >/dev/null 2>&1
+  for _h in web1 web2 bd1; do
+    SSHPASS='Labby123' sshpass -e ssh-copy-id -o StrictHostKeyChecking=no \
+      -i /home/ansible_user/.ssh/id_rsa.pub ansible_user@"$_h" >/dev/null 2>&1 || true
+  done
 fi
 
-# Language argument
-lang="${1:-en}" # Default to English if no language is specified
+cmd1='```yaml
+---
+- name: conditional package install
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: install tree on Debian systems
+      package:
+        name: tree
+        state: present
+      when: ansible_os_family == "Debian"
+```'
 
-# Define the question, hint, instructions, and answers based on the language
+cmd2="ansible-playbook -i $inventory_path $pb_path"
+
 case "$lang" in
-  "en")
-    question="Where must custom fact files be stored on managed hosts for Ansible to discover them automatically?"
-    hint="Ansible looks for a specific directory under /etc on managed hosts. The files must have a .fact extension and be in INI or JSON format."
-    instructions="[
-                  {
-                    \"instruction\": \"Create the <span class=\\\"bold-green-text\\\">/etc/ansible/facts.d</span> directory and deploy a .fact file to it using a playbook.\",
-                    \"command\": \"- name: create facts directory\\n  file:\\n    state: directory\\n    path: /etc/ansible/facts.d\\n    recurse: yes\\n\\n- name: deploy custom fact file\\n  copy:\\n    src: custom.fact\\n    dest: /etc/ansible/facts.d/\"
-                  },
-                  {
-                    \"instruction\": \"Verify that custom facts are discovered by running the setup module with a filter.\",
-                    \"command\": \"ansible all -m setup -a \\\"filter=ansible_local\\\"\"
-                  }
-                ]"
-    answer_a="/etc/ansible/facts"
-    answer_b="/etc/ansible/facts.d"  # Correct answer
-    answer_c="/var/ansible/facts.d"
-    answer_d="~/.ansible/facts.d"
+  en)
+    question="Write a playbook at \`$pb_path\` targeting \`webservers\` that installs the \`tree\` package only when \`ansible_os_family == \"Debian\"\` using the \`when:\` directive. Use \`become: yes\` and run the playbook."
+    hint="The when: directive accepts a Jinja2 expression without curly braces. ansible_os_family is a fact collected automatically by Ansible — no setup task needed. Use become: yes since package installation requires root."
+    inst1="Create the playbook at <span class=\"bold-green-text\">$pb_path</span> with a <span class=\"bold-green-text\">when:</span> condition on the install task — note: no <span class=\"bold-green-text\">{{ }}</span> needed in when: expressions:"
+    inst2="Run the playbook — <span class=\"bold-green-text\">tree</span> should be installed only on webservers where the OS family is Debian:"
     ;;
-  "fr")
-    question="Où les fichiers de faits personnalisés doivent-ils être stockés sur les hôtes gérés pour qu'Ansible les découvre automatiquement ?"
-    hint="Ansible cherche dans un répertoire spécifique sous /etc sur les hôtes gérés. Les fichiers doivent avoir l'extension .fact et être au format INI ou JSON."
-    instructions="[
-                  {
-                    \"instruction\": \"Créez le répertoire <span class=\\\"bold-green-text\\\">/etc/ansible/facts.d</span> et déployez un fichier .fact avec un playbook.\",
-                    \"command\": \"- name: créer le répertoire des faits\\n  file:\\n    state: directory\\n    path: /etc/ansible/facts.d\\n    recurse: yes\\n\\n- name: déployer le fichier de fait personnalisé\\n  copy:\\n    src: custom.fact\\n    dest: /etc/ansible/facts.d/\"
-                  },
-                  {
-                    \"instruction\": \"Vérifiez que les faits personnalisés sont découverts avec le module setup et un filtre.\",
-                    \"command\": \"ansible all -m setup -a \\\"filter=ansible_local\\\"\"
-                  }
-                ]"
-    answer_a="/etc/ansible/facts"
-    answer_b="/etc/ansible/facts.d"  # Correct answer
-    answer_c="/var/ansible/facts.d"
-    answer_d="~/.ansible/facts.d"
+  fr)
+    question="Écrivez un playbook à \`$pb_path\` ciblant \`webservers\` qui installe le paquet \`tree\` uniquement quand \`ansible_os_family == \"Debian\"\` en utilisant la directive \`when:\`. Utilisez \`become: yes\` et exécutez le playbook."
+    hint="La directive when: accepte une expression Jinja2 sans accolades. ansible_os_family est un fait collecté automatiquement par Ansible — aucune tâche setup n'est nécessaire. Utilisez become: yes car l'installation de paquets requiert les droits root."
+    inst1="Créez le playbook à <span class=\"bold-green-text\">$pb_path</span> avec une condition <span class=\"bold-green-text\">when:</span> sur la tâche d'installation — remarque : pas de <span class=\"bold-green-text\">{{ }}</span> nécessaire dans les expressions when: :"
+    inst2="Exécutez le playbook — <span class=\"bold-green-text\">tree</span> doit être installé uniquement sur les webservers dont la famille OS est Debian :"
     ;;
   *)
-    question="Where must custom fact files be stored on managed hosts for Ansible to discover them automatically?"
-    hint="Ansible looks for a specific directory under /etc on managed hosts. The files must have a .fact extension and be in INI or JSON format."
-    instructions="[
-                  {
-                    \"instruction\": \"Create the <span class=\\\"bold-green-text\\\">/etc/ansible/facts.d</span> directory and deploy a .fact file to it using a playbook.\",
-                    \"command\": \"- name: create facts directory\\n  file:\\n    state: directory\\n    path: /etc/ansible/facts.d\\n    recurse: yes\\n\\n- name: deploy custom fact file\\n  copy:\\n    src: custom.fact\\n    dest: /etc/ansible/facts.d/\"
-                  },
-                  {
-                    \"instruction\": \"Verify that custom facts are discovered by running the setup module with a filter.\",
-                    \"command\": \"ansible all -m setup -a \\\"filter=ansible_local\\\"\"
-                  }
-                ]"
-    answer_a="/etc/ansible/facts"
-    answer_b="/etc/ansible/facts.d"  # Correct answer
-    answer_c="/var/ansible/facts.d"
-    answer_d="~/.ansible/facts.d"
-    ;;
+    echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
 esac
 
-# Put answers in an array
-answers=("\"answer_a\":\"$answer_a\"" "\"answer_b\":\"$answer_b\"" "\"answer_c\":\"$answer_c\"" "\"answer_d\":\"$answer_d\"")
+instructions=$(jq -n \
+  --arg inst1 "$inst1" --arg cmd1 "$cmd1" \
+  --arg inst2 "$inst2" --arg cmd2 "$cmd2" \
+  '[{"instruction": $inst1, "command": $cmd1}, {"instruction": $inst2, "command": $cmd2}]')
 
-# Shuffle the answers to avoid predictable order
-shuffled_answers=$(printf "%s\n" "${answers[@]}" | shuf | paste -sd,)
-
-# Build the display JSON
-display='{
-  "question": "'"$question"'",
-  "type": "multi",
-  "answers": {
-    '"$shuffled_answers"'
-  },
-  "hint": "'"$hint"'",
-  "instructions": '"$instructions"',
-  "solution": "'"$answer_b"'",
-  "plateforme_required": "server",
-  "os_required": "ubuntu"
-}'
-
-# Pretty print the JSON output
-echo "$display" | jq .
+jq -n --indent 4 \
+  --arg question "$question" \
+  --arg hint "$hint" \
+  --argjson instructions "$instructions" \
+  '{
+    "question": $question,
+    "plateforme_required": "container",
+    "os_required": "ubuntu",
+    "type": "button",
+    "hint": $hint,
+    "instructions": $instructions,
+    "text": "Check",
+    "tags": "ansible,variables,when,conditional,playbook"
+  }'

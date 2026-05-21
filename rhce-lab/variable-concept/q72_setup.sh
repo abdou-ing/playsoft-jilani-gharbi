@@ -1,91 +1,54 @@
 #!/bin/bash
+if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
+lang="${1:-en}"
 
-# Check if "debug" is passed as an argument
-if [[ "$1" == "debug" ]]; then
-  set -eoux
-  shift
-fi
+pb_path="/home/ansible_user/workspace/create_user.yml"
 
-# Language argument
-lang="${1:-en}" # Default to English if no language is specified
+cmd1='```yaml
+---
+- name: create devops user
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: add user devops
+      user:
+        name: devops
+        state: present
+```'
+cmd2="ansible-playbook /home/ansible_user/workspace/create_user.yml
+ansible webservers -m command -a 'id devops'"
 
-# Define the question, hint, instructions, and answers based on the language
 case "$lang" in
-  "en")
-    question="Which command would you run on the control node to verify that custom facts are properly loaded on ALL managed hosts?"
-    hint="Try each option on your control node. The correct command uses the setup module with a specific filter argument that targets custom facts only."
-    instructions="[
-                  {
-                    \"instruction\": \"Run the command on your control node and observe the output. Custom facts are stored under the <span class=\\\"bold-green-text\\\">ansible_local</span> key.\",
-                    \"command\": \"ansible all -m setup -a \\\"filter=ansible_local\\\"\"
-                  },
-                  {
-                    \"instruction\": \"The output will show the contents of every .fact file found in /etc/ansible/facts.d on each host.\",
-                    \"command\": \"# Example output:\\nansible1 | SUCCESS => {\\n    \\\"ansible_facts\\\": {\\n        \\\"ansible_local\\\": {\\n            \\\"custom\\\": {\\n                \\\"software\\\": {\\n                    \\\"package\\\": \\\"httpd\\\"\\n                }\\n            }\\n        }\\n    }\\n}\"
-                  }
-                ]"
-    answer_a="ansible all -m debug -a 'var=ansible_facts'"
-    answer_b="ansible all -m setup -a 'filter=ansible_facts[ansible_local]'"
-    answer_c="ansible-playbook --check facts.yml"
-    answer_d="ansible all -m setup -a 'filter=ansible_local'"  # Correct answer
+  en)
+    question="Write a playbook at \`$pb_path\` that creates a user named \`devops\` on all \`webservers\` hosts, then run it."
+    hint="Use the user module with name: devops and state: present. You will need become: yes since creating users requires root privileges."
+    inst1="Create the playbook using the <span class=\"bold-green-text\">user</span> module with <span class=\"bold-green-text\">name: devops</span> and <span class=\"bold-green-text\">state: present</span> — requires <span class=\"bold-green-text\">become: yes</span>:"
+    inst2="Run the playbook and verify the <span class=\"bold-green-text\">devops</span> user was created on all webservers:"
     ;;
-  "fr")
-    question="Quelle commande exécuteriez-vous sur le nœud de contrôle pour vérifier que les faits personnalisés sont correctement chargés sur TOUS les hôtes gérés ?"
-    hint="Essayez chaque option sur votre nœud de contrôle. La bonne commande utilise le module setup avec un argument filter spécifique qui cible uniquement les faits personnalisés."
-    instructions="[
-                  {
-                    \"instruction\": \"Exécutez la commande sur votre nœud de contrôle et observez la sortie. Les faits personnalisés sont stockés sous la clé <span class=\\\"bold-green-text\\\">ansible_local</span>.\",
-                    \"command\": \"ansible all -m setup -a \\\"filter=ansible_local\\\"\"
-                  },
-                  {
-                    \"instruction\": \"La sortie affichera le contenu de chaque fichier .fact trouvé dans /etc/ansible/facts.d sur chaque hôte.\",
-                    \"command\": \"# Exemple de sortie :\\nansible1 | SUCCESS => {\\n    \\\"ansible_facts\\\": {\\n        \\\"ansible_local\\\": {\\n            \\\"custom\\\": {\\n                \\\"software\\\": {\\n                    \\\"package\\\": \\\"httpd\\\"\\n                }\\n            }\\n        }\\n    }\\n}\"
-                  }
-                ]"
-    answer_a="ansible all -m debug -a 'var=ansible_facts'"
-    answer_b="ansible all -m setup -a 'filter=ansible_facts[ansible_local]'"
-    answer_c="ansible-playbook --check facts.yml"
-    answer_d="ansible all -m setup -a 'filter=ansible_local'"  # Correct answer
+  fr)
+    question="Écrivez un playbook à \`$pb_path\` qui crée un utilisateur nommé \`devops\` sur tous les hôtes \`webservers\`, puis exécutez-le."
+    hint="Utilisez le module user avec name: devops et state: present. Vous aurez besoin de become: yes car la création d'utilisateurs nécessite des privilèges root."
+    inst1="Créez le playbook avec le module <span class=\"bold-green-text\">user</span> avec <span class=\"bold-green-text\">name: devops</span> et <span class=\"bold-green-text\">state: present</span> — nécessite <span class=\"bold-green-text\">become: yes</span> :"
+    inst2="Exécutez le playbook et vérifiez que l'utilisateur <span class=\"bold-green-text\">devops</span> a été créé sur tous les webservers :"
     ;;
   *)
-    question="Which command would you run on the control node to verify that custom facts are properly loaded on ALL managed hosts?"
-    hint="Try each option on your control node. The correct command uses the setup module with a specific filter argument that targets custom facts only."
-    instructions="[
-                  {
-                    \"instruction\": \"Run the command on your control node and observe the output. Custom facts are stored under the <span class=\\\"bold-green-text\\\">ansible_local</span> key.\",
-                    \"command\": \"ansible all -m setup -a \\\"filter=ansible_local\\\"\"
-                  },
-                  {
-                    \"instruction\": \"The output will show the contents of every .fact file found in /etc/ansible/facts.d on each host.\",
-                    \"command\": \"# Example output:\\nansible1 | SUCCESS => {\\n    \\\"ansible_facts\\\": {\\n        \\\"ansible_local\\\": {\\n            \\\"custom\\\": {\\n                \\\"software\\\": {\\n                    \\\"package\\\": \\\"httpd\\\"\\n                }\\n            }\\n        }\\n    }\\n}\"
-                  }
-                ]"
-    answer_a="ansible all -m debug -a 'var=ansible_facts'"
-    answer_b="ansible all -m setup -a 'filter=ansible_facts[ansible_local]'"
-    answer_c="ansible-playbook --check facts.yml"
-    answer_d="ansible all -m setup -a 'filter=ansible_local'"  # Correct answer
-    ;;
+    echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
 esac
 
-# Put answers in an array
-answers=("\"answer_a\":\"$answer_a\"" "\"answer_b\":\"$answer_b\"" "\"answer_c\":\"$answer_c\"" "\"answer_d\":\"$answer_d\"")
+instructions=$(jq -n --arg inst1 "$inst1" --arg cmd1 "$cmd1" --arg inst2 "$inst2" --arg cmd2 "$cmd2" \
+  '[{"instruction": $inst1, "command": $cmd1}, {"instruction": $inst2, "command": $cmd2}]')
 
-# Shuffle the answers to avoid predictable order
-shuffled_answers=$(printf "%s\n" "${answers[@]}" | shuf | paste -sd,)
-
-# Build the display JSON
-display='{
-  "question": "'"$question"'",
-  "type": "multi",
-  "answers": {
-    '"$shuffled_answers"'
-  },
-  "hint": "'"$hint"'",
-  "instructions": '"$instructions"',
-  "solution": "'"$answer_d"'",
-  "plateforme_required": "container",
-  "os_required": "ubuntu"
-}'
-
-# Pretty print the JSON output
-echo "$display" | jq .
+jq -n --indent 4 \
+  --arg question "$question" \
+  --arg hint "$hint" \
+  --argjson instructions "$instructions" \
+  '{
+    "question": $question,
+    "plateforme_required": "container",
+    "os_required": "ubuntu",
+    "type": "button",
+    "hint": $hint,
+    "instructions": $instructions,
+    "text": "Check",
+    "tags": "ansible,user,playbook,become"
+  }'

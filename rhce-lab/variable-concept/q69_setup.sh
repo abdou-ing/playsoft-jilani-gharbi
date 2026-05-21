@@ -1,91 +1,59 @@
 #!/bin/bash
+if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
+lang="${1:-en}"
 
-# Check if "debug" is passed as an argument
-if [[ "$1" == "debug" ]]; then
-  set -eoux
-  shift
-fi
+pb_path="/home/ansible_user/workspace/install_pkg.yml"
 
-# Language argument
-lang="${1:-en}" # Default to English if no language is specified
+cmd1='```yaml
+---
+- name: install package from variable
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: install pkg_name
+      package:
+        name: "{{ pkg_name }}"
+        state: present
+```'
+cmd2="ansible-playbook /home/ansible_user/workspace/install_pkg.yml"
 
-# Define the question, hint, instructions, and answers based on the language
 case "$lang" in
-  "en")
-    question="What is wrong with the following playbook?\n\n---\n- name: install a package\n  hosts: all\n  vars:\n    pkg_name: httpd\n  tasks:\n    - name: install package\n      yum:\n        name: {{ pkg_name }}\n        state: present"
-    hint="YAML has strict rules about values that start with certain characters. Look carefully at line 9 — the name: value in the yum task."
-    instructions="[
-                  {
-                    \"instruction\": \"YAML treats any value starting with <span class=\\\"bold-green-text\\\">{{</span> as a dictionary literal and raises a parse error.\",
-                    \"command\": \"# Fix: wrap the variable reference in double quotes\\n        name: \\\"{{ pkg_name }}\\\"\"
-                  },
-                  {
-                    \"instruction\": \"The same rule applies everywhere a value begins with a variable reference.\",
-                    \"command\": \"# WRONG:\\nsrc: {{ my_file }}\\n\\n# CORRECT:\\nsrc: \\\"{{ my_file }}\\\"\"
-                  }
-                ]"
-    answer_a="The state: present should be state: latest"
-    answer_b="The variable reference {{ pkg_name }} is missing double quotes"  # Correct answer
-    answer_c="The vars: section should be placed inside tasks:"
-    answer_d="The yum module requires a become: yes directive"
+  en)
+    question="Write a playbook at \`$pb_path\` that installs the package defined by the \`pkg_name\` group variable on all \`webservers\` hosts, then run it."
+    hint="Use the yum or apt module with name: '{{ pkg_name }}'. The variable pkg_name must already be set in your inventory (e.g. pkg_name=nginx under [webservers:vars])."
+    inst1="Use the <span class=\"bold-green-text\">package</span> module with <span class=\"bold-green-text\">name: \"{{ pkg_name }}\"</span> — the variable is resolved from the inventory group vars at runtime:"
+    inst2="Run the playbook with <span class=\"bold-green-text\">become: yes</span> — installing packages requires root privileges:"
     ;;
-  "fr")
-    question="Qu'est-ce qui ne va pas dans ce playbook ?\n\n---\n- name: installer un paquet\n  hosts: all\n  vars:\n    pkg_name: httpd\n  tasks:\n    - name: installer le paquet\n      yum:\n        name: {{ pkg_name }}\n        state: present"
-    hint="YAML a des règles strictes concernant les valeurs qui commencent par certains caractères. Regardez attentivement la ligne 9 — la valeur name: dans la tâche yum."
-    instructions="[
-                  {
-                    \"instruction\": \"YAML traite toute valeur commençant par <span class=\\\"bold-green-text\\\">{{</span> comme un dictionnaire littéral et lève une erreur d'analyse.\",
-                    \"command\": \"# Correction : entourez la référence de variable de guillemets doubles\\n        name: \\\"{{ pkg_name }}\\\"\"
-                  },
-                  {
-                    \"instruction\": \"La même règle s'applique partout où une valeur commence par une référence de variable.\",
-                    \"command\": \"# INCORRECT :\\nsrc: {{ my_file }}\\n\\n# CORRECT :\\nsrc: \\\"{{ my_file }}\\\"\"
-                  }
-                ]"
-    answer_a="Le state: present devrait être state: latest"
-    answer_b="La référence de variable {{ pkg_name }} est privée de guillemets doubles"  # Correct answer
-    answer_c="La section vars: devrait être placée dans tasks:"
-    answer_d="Le module yum nécessite une directive become: yes"
+  fr)
+    question="Écrivez un playbook à \`$pb_path\` qui installe le paquet défini par la variable de groupe \`pkg_name\` sur tous les hôtes \`webservers\`, puis exécutez-le."
+    hint="Utilisez le module yum ou apt avec name: '{{ pkg_name }}'. La variable pkg_name doit déjà être définie dans votre inventaire (ex. pkg_name=nginx sous [webservers:vars])."
+    inst1="Utilisez le module <span class=\"bold-green-text\">package</span> avec <span class=\"bold-green-text\">name: \"{{ pkg_name }}\"</span> — la variable est résolue depuis les variables de groupe de l'inventaire à l'exécution :"
+    inst2="Exécutez le playbook avec <span class=\"bold-green-text\">become: yes</span> — l'installation de paquets nécessite les droits root :"
     ;;
   *)
-    question="What is wrong with the following playbook?\n\n---\n- name: install a package\n  hosts: all\n  vars:\n    pkg_name: httpd\n  tasks:\n    - name: install package\n      yum:\n        name: {{ pkg_name }}\n        state: present"
-    hint="YAML has strict rules about values that start with certain characters. Look carefully at line 9 — the name: value in the yum task."
-    instructions="[
-                  {
-                    \"instruction\": \"YAML treats any value starting with <span class=\\\"bold-green-text\\\">{{</span> as a dictionary literal and raises a parse error.\",
-                    \"command\": \"# Fix: wrap the variable reference in double quotes\\n        name: \\\"{{ pkg_name }}\\\"\"
-                  },
-                  {
-                    \"instruction\": \"The same rule applies everywhere a value begins with a variable reference.\",
-                    \"command\": \"# WRONG:\\nsrc: {{ my_file }}\\n\\n# CORRECT:\\nsrc: \\\"{{ my_file }}\\\"\"
-                  }
-                ]"
-    answer_a="The state: present should be state: latest"
-    answer_b="The variable reference {{ pkg_name }} is missing double quotes"  # Correct answer
-    answer_c="The vars: section should be placed inside tasks:"
-    answer_d="The yum module requires a become: yes directive"
-    ;;
+    echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
 esac
 
-# Put answers in an array
-answers=("\"answer_a\":\"$answer_a\"" "\"answer_b\":\"$answer_b\"" "\"answer_c\":\"$answer_c\"" "\"answer_d\":\"$answer_d\"")
+# Handle the case user skipped adding pkg_name group variable (q67)
+if ! grep -q "pkg_name" /home/ansible_user/workspace/inventory 2>/dev/null; then
+  grep -q '\[webservers:vars\]' /home/ansible_user/workspace/inventory || printf '\n[webservers:vars]\n' >> /home/ansible_user/workspace/inventory
+  echo 'pkg_name=nginx' >> /home/ansible_user/workspace/inventory
+fi
 
-# Shuffle the answers to avoid predictable order
-shuffled_answers=$(printf "%s\n" "${answers[@]}" | shuf | paste -sd,)
+instructions=$(jq -n --arg inst1 "$inst1" --arg cmd1 "$cmd1" --arg inst2 "$inst2" --arg cmd2 "$cmd2" \
+  '[{"instruction": $inst1, "command": $cmd1}, {"instruction": $inst2, "command": $cmd2}]')
 
-# Build the display JSON
-display='{
-  "question": "'"$question"'",
-  "type": "multi",
-  "answers": {
-    '"$shuffled_answers"'
-  },
-  "hint": "'"$hint"'",
-  "instructions": '"$instructions"',
-  "solution": "'"$answer_b"'",
-  "plateforme_required": "server",
-  "os_required": "ubuntu"
-}'
-
-# Pretty print the JSON output
-echo "$display" | jq .
+jq -n --indent 4 \
+  --arg question "$question" \
+  --arg hint "$hint" \
+  --argjson instructions "$instructions" \
+  '{
+    "question": $question,
+    "plateforme_required": "container",
+    "os_required": "ubuntu",
+    "type": "button",
+    "hint": $hint,
+    "instructions": $instructions,
+    "text": "Check",
+    "tags": "ansible,variables,package,playbook"
+  }'

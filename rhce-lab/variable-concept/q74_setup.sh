@@ -1,91 +1,54 @@
 #!/bin/bash
+if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
+lang="${1:-en}"
 
-# Check if "debug" is passed as an argument
-if [[ "$1" == "debug" ]]; then
-  set -eoux
-  shift
-fi
+inventory_path="/home/ansible_user/workspace/inventory"
 
-# Language argument
-lang="${1:-en}" # Default to English if no language is specified
+cmd1='```ini
+# Edit your inventory file and add:
+[webservers:vars]
+pkg_name=nginx
+env=staging
+```'
+cmd2="ansible webservers -m debug -a 'var=env'"
 
-# Define the question, hint, instructions, and answers based on the language
 case "$lang" in
-  "en")
-    question="Which ansible command would you run to find the OS distribution of ALL managed hosts without writing a playbook?"
-    hint="Try each command on your control node. One of them uses the setup module with a filter that targets only the distribution fact."
-    instructions="[
-                  {
-                    \"instruction\": \"The <span class=\\\"bold-green-text\\\">setup</span> module collects all facts. Use the <span class=\\\"bold-green-text\\\">filter</span> argument to narrow down to a specific fact name.\",
-                    \"command\": \"ansible all -m setup -a 'filter=ansible_distribution'\"
-                  },
-                  {
-                    \"instruction\": \"The output shows the OS distribution for each host. You can also use <span class=\\\"bold-green-text\\\">ansible_distribution_version</span> or <span class=\\\"bold-green-text\\\">ansible_os_family</span> as filter values.\",
-                    \"command\": \"# Example output:\\nansible1 | SUCCESS => {\\n    \\\"ansible_facts\\\": {\\n        \\\"ansible_distribution\\\": \\\"RedHat\\\"\\n    }\\n}\"
-                  }
-                ]"
-    answer_a="ansible all -m debug -a 'var=ansible_distribution'"
-    answer_b="ansible all -m setup -a 'filter=ansible_os_family'"
-    answer_c="ansible all -m setup -a 'filter=ansible_distribution'"  # Correct answer
-    answer_d="ansible-playbook -e 'gather_facts=yes' site.yml"
+  en)
+    question="Add the group variable \`env=staging\` to the \`webservers\` group in the inventory file at \`$inventory_path\`. Verify it with an ad-hoc command."
+    hint="Add env=staging under the [webservers:vars] section. You can verify it is available with: ansible webservers -m debug -a 'var=env'"
+    inst1="Add <span class=\"bold-green-text\">env=staging</span> under the <span class=\"bold-green-text\">[webservers:vars]</span> section in your inventory file — it will be available as a variable on all hosts in the group:"
+    inst2="Verify the <span class=\"bold-green-text\">env</span> variable is accessible on all <span class=\"bold-green-text\">webservers</span> hosts with an ad-hoc debug command:"
     ;;
-  "fr")
-    question="Quelle commande ansible exécuteriez-vous pour trouver la distribution OS de TOUS les hôtes gérés sans écrire de playbook ?"
-    hint="Essayez chaque commande sur votre nœud de contrôle. L'une d'elles utilise le module setup avec un filtre qui cible uniquement le fait distribution."
-    instructions="[
-                  {
-                    \"instruction\": \"Le module <span class=\\\"bold-green-text\\\">setup</span> collecte tous les faits. Utilisez l'argument <span class=\\\"bold-green-text\\\">filter</span> pour cibler un nom de fait spécifique.\",
-                    \"command\": \"ansible all -m setup -a 'filter=ansible_distribution'\"
-                  },
-                  {
-                    \"instruction\": \"La sortie affiche la distribution OS pour chaque hôte. Vous pouvez aussi utiliser <span class=\\\"bold-green-text\\\">ansible_distribution_version</span> ou <span class=\\\"bold-green-text\\\">ansible_os_family</span> comme valeurs de filtre.\",
-                    \"command\": \"# Exemple de sortie :\\nansible1 | SUCCESS => {\\n    \\\"ansible_facts\\\": {\\n        \\\"ansible_distribution\\\": \\\"RedHat\\\"\\n    }\\n}\"
-                  }
-                ]"
-    answer_a="ansible all -m debug -a 'var=ansible_distribution'"
-    answer_b="ansible all -m setup -a 'filter=ansible_os_family'"
-    answer_c="ansible all -m setup -a 'filter=ansible_distribution'"  # Correct answer
-    answer_d="ansible-playbook -e 'gather_facts=yes' site.yml"
+  fr)
+    question="Ajoutez la variable de groupe \`env=staging\` au groupe \`webservers\` dans le fichier d'inventaire \`$inventory_path\`. Vérifiez-la avec une commande ad-hoc."
+    hint="Ajoutez env=staging sous la section [webservers:vars]. Vous pouvez vérifier qu'elle est disponible avec : ansible webservers -m debug -a 'var=env'"
+    inst1="Ajoutez <span class=\"bold-green-text\">env=staging</span> sous la section <span class=\"bold-green-text\">[webservers:vars]</span> dans votre fichier d'inventaire — elle sera disponible comme variable sur tous les hôtes du groupe :"
+    inst2="Vérifiez que la variable <span class=\"bold-green-text\">env</span> est accessible sur tous les hôtes <span class=\"bold-green-text\">webservers</span> avec une commande debug ad-hoc :"
     ;;
   *)
-    question="Which ansible command would you run to find the OS distribution of ALL managed hosts without writing a playbook?"
-    hint="Try each command on your control node. One of them uses the setup module with a filter that targets only the distribution fact."
-    instructions="[
-                  {
-                    \"instruction\": \"The <span class=\\\"bold-green-text\\\">setup</span> module collects all facts. Use the <span class=\\\"bold-green-text\\\">filter</span> argument to narrow down to a specific fact name.\",
-                    \"command\": \"ansible all -m setup -a 'filter=ansible_distribution'\"
-                  },
-                  {
-                    \"instruction\": \"The output shows the OS distribution for each host. You can also use <span class=\\\"bold-green-text\\\">ansible_distribution_version</span> or <span class=\\\"bold-green-text\\\">ansible_os_family</span> as filter values.\",
-                    \"command\": \"# Example output:\\nansible1 | SUCCESS => {\\n    \\\"ansible_facts\\\": {\\n        \\\"ansible_distribution\\\": \\\"RedHat\\\"\\n    }\\n}\"
-                  }
-                ]"
-    answer_a="ansible all -m debug -a 'var=ansible_distribution'"
-    answer_b="ansible all -m setup -a 'filter=ansible_os_family'"
-    answer_c="ansible all -m setup -a 'filter=ansible_distribution'"  # Correct answer
-    answer_d="ansible-playbook -e 'gather_facts=yes' site.yml"
-    ;;
+    echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
 esac
 
-# Put answers in an array
-answers=("\"answer_a\":\"$answer_a\"" "\"answer_b\":\"$answer_b\"" "\"answer_c\":\"$answer_c\"" "\"answer_d\":\"$answer_d\"")
+# Handle the case user skipped adding pkg_name group variable (q67)
+if ! grep -q "pkg_name" /home/ansible_user/workspace/inventory 2>/dev/null; then
+  grep -q '\[webservers:vars\]' /home/ansible_user/workspace/inventory || printf '\n[webservers:vars]\n' >> /home/ansible_user/workspace/inventory
+  echo 'pkg_name=nginx' >> /home/ansible_user/workspace/inventory
+fi
 
-# Shuffle the answers to avoid predictable order
-shuffled_answers=$(printf "%s\n" "${answers[@]}" | shuf | paste -sd,)
+instructions=$(jq -n --arg inst1 "$inst1" --arg cmd1 "$cmd1" --arg inst2 "$inst2" --arg cmd2 "$cmd2" \
+  '[{"instruction": $inst1, "command": $cmd1}, {"instruction": $inst2, "command": $cmd2}]')
 
-# Build the display JSON
-display='{
-  "question": "'"$question"'",
-  "type": "multi",
-  "answers": {
-    '"$shuffled_answers"'
-  },
-  "hint": "'"$hint"'",
-  "instructions": '"$instructions"',
-  "solution": "'"$answer_c"'",
-  "plateforme_required": "container",
-  "os_required": "ubuntu"
-}'
-
-# Pretty print the JSON output
-echo "$display" | jq .
+jq -n --indent 4 \
+  --arg question "$question" \
+  --arg hint "$hint" \
+  --argjson instructions "$instructions" \
+  '{
+    "question": $question,
+    "plateforme_required": "container",
+    "os_required": "ubuntu",
+    "type": "button",
+    "hint": $hint,
+    "instructions": $instructions,
+    "text": "Check",
+    "tags": "ansible,variables,inventory,group-vars"
+  }'

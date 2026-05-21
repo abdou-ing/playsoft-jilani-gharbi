@@ -1,91 +1,91 @@
 #!/bin/bash
+if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
+lang="${1:-en}"
 
-# Check if "debug" is passed as an argument
-if [[ "$1" == "debug" ]]; then
-  set -eoux
-  shift
+pb_path="/home/ansible_user/workspace/facts_demo.yml"
+inventory_path="/home/ansible_user/workspace/inventory"
+
+# Skip-q60 guard
+if [ ! -f "$inventory_path" ]; then
+  mkdir -p /home/ansible_user/workspace
+  printf '[webservers]\nweb1\nweb2\n\n[dbservers]\nbd1\n\n[all:vars]\nansible_user=ansible_user\n' \
+    > "$inventory_path"
+fi
+for entry in "10.30.0.11 web1" "10.30.0.12 web2" "10.30.0.13 bd1"; do
+  grep -qF "${entry%% *}" /etc/hosts 2>/dev/null || \
+    printf '%s\n' "$entry" | sudo tee -a /etc/hosts >/dev/null 2>&1 || true
+done
+if [ ! -f "/home/ansible_user/.ssh/id_rsa" ]; then
+  ssh-keygen -t rsa -b 2048 -f /home/ansible_user/.ssh/id_rsa -N "" >/dev/null 2>&1
+  for _h in web1 web2 bd1; do
+    SSHPASS='Labby123' sshpass -e ssh-copy-id -o StrictHostKeyChecking=no \
+      -i /home/ansible_user/.ssh/id_rsa.pub ansible_user@"$_h" >/dev/null 2>&1 || true
+  done
 fi
 
-# Language argument
-lang="${1:-en}" # Default to English if no language is specified
+cmd1='```yaml
+---
+- name: display OS distribution
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: show distribution
+      debug:
+        msg: "OS is {{ ansible_facts['"'"'distribution'"'"'] }}"
+```'
 
-# Define the question, hint, instructions, and answers based on the language
+cmd2='```yaml
+---
+- name: display OS distribution
+  hosts: all
+  tasks:
+    - name: show distribution
+      debug:
+        msg: "OS is {{ ansible_facts['"'"'distribution'"'"'] }}"
+```'
+
+cmd3="ansible-playbook -i $inventory_path $pb_path"
+
 case "$lang" in
-  "en")
-    question="Which variable definition has the HIGHEST precedence in Ansible?"
-    hint="The most specific variable always wins. Think about where a variable is defined closest to actual runtime execution."
-    instructions="[
-                  {
-                    \"instruction\": \"Variables passed on the command line with <span class=\\\"bold-green-text\\\">-e</span> have the highest precedence and override everything else.\",
-                    \"command\": \"# Overrides any vars: defined in the playbook:\\nansible-playbook site.yml -e \\\"my_var=override_value\\\"\\n\\n# Precedence order (highest to lowest):\\n# 1. Command line: -e key=value\\n# 2. Playbook vars: section\\n# 3. Inventory variables (group_vars, host_vars)\"
-                  },
-                  {
-                    \"instruction\": \"Verify which value wins by using the debug module in a playbook.\",
-                    \"command\": \"- name: check variable value\\n  debug:\\n    msg: \\\"Value is {{ my_var }}\\\"\"
-                  }
-                ]"
-    answer_a="Variables defined in a playbook vars: section"
-    answer_b="Variables defined in group_vars files"
-    answer_c="Variables defined in host_vars files"
-    answer_d="Variables passed on the command line with -e key=value"  # Correct answer
+  en)
+    question="Write a playbook at \`$pb_path\` that displays the OS distribution of all managed hosts using \`ansible_facts['distribution']\` and the \`debug\` module. The playbook must actually show the value — not \`VARIABLE IS NOT DEFINED\`. Run it."
+    hint="gather_facts: yes is the default — do not add gather_facts: no or facts will be empty. ansible_facts['distribution'] is populated automatically when Ansible connects to each host."
+    inst1="The broken version below uses <span class=\"bold-green-text\">gather_facts: no</span>, which empties ansible_facts — the debug output will show VARIABLE IS NOT DEFINED:"
+    inst2="The fix is simple: remove <span class=\"bold-green-text\">gather_facts: no</span> (or omit it entirely). Ansible collects facts by default before running any task:"
+    inst3="Run the playbook — each host should display its OS distribution (e.g. <span class=\"bold-green-text\">Ubuntu</span>):"
     ;;
-  "fr")
-    question="Quelle définition de variable a la PLUS HAUTE priorité dans Ansible ?"
-    hint="La variable la plus spécifique l'emporte toujours. Pensez à l'endroit où une variable est définie le plus près de l'exécution réelle."
-    instructions="[
-                  {
-                    \"instruction\": \"Les variables passées en ligne de commande avec <span class=\\\"bold-green-text\\\">-e</span> ont la priorité la plus haute et remplacent tout le reste.\",
-                    \"command\": \"# Remplace tout vars: défini dans le playbook :\\nansible-playbook site.yml -e \\\"my_var=valeur_override\\\"\\n\\n# Ordre de priorité (du plus élevé au plus bas) :\\n# 1. Ligne de commande : -e key=value\\n# 2. Section vars: du playbook\\n# 3. Variables d'inventaire (group_vars, host_vars)\"
-                  },
-                  {
-                    \"instruction\": \"Vérifiez quelle valeur l'emporte avec le module debug dans un playbook.\",
-                    \"command\": \"- name: vérifier la valeur de la variable\\n  debug:\\n    msg: \\\"Valeur : {{ my_var }}\\\"\"
-                  }
-                ]"
-    answer_a="Variables définies dans la section vars: d'un playbook"
-    answer_b="Variables définies dans les fichiers group_vars"
-    answer_c="Variables définies dans les fichiers host_vars"
-    answer_d="Variables passées en ligne de commande avec -e key=value"  # Correct answer
+  fr)
+    question="Écrivez un playbook à \`$pb_path\` qui affiche la distribution OS de tous les hôtes gérés en utilisant \`ansible_facts['distribution']\` et le module \`debug\`. Le playbook doit vraiment afficher la valeur — pas \`VARIABLE IS NOT DEFINED\`. Exécutez-le."
+    hint="gather_facts: yes est la valeur par défaut — n'ajoutez pas gather_facts: no ou les faits seront vides. ansible_facts['distribution'] est rempli automatiquement quand Ansible se connecte à chaque hôte."
+    inst1="La version cassée ci-dessous utilise <span class=\"bold-green-text\">gather_facts: no</span>, ce qui vide ansible_facts — la sortie debug affichera VARIABLE IS NOT DEFINED :"
+    inst2="La correction est simple : supprimez <span class=\"bold-green-text\">gather_facts: no</span> (ou omettez-le). Ansible collecte les faits par défaut avant d'exécuter toute tâche :"
+    inst3="Exécutez le playbook — chaque hôte doit afficher sa distribution OS (ex. <span class=\"bold-green-text\">Ubuntu</span>) :"
     ;;
   *)
-    question="Which variable definition has the HIGHEST precedence in Ansible?"
-    hint="The most specific variable always wins. Think about where a variable is defined closest to actual runtime execution."
-    instructions="[
-                  {
-                    \"instruction\": \"Variables passed on the command line with <span class=\\\"bold-green-text\\\">-e</span> have the highest precedence and override everything else.\",
-                    \"command\": \"# Overrides any vars: defined in the playbook:\\nansible-playbook site.yml -e \\\"my_var=override_value\\\"\\n\\n# Precedence order (highest to lowest):\\n# 1. Command line: -e key=value\\n# 2. Playbook vars: section\\n# 3. Inventory variables (group_vars, host_vars)\"
-                  },
-                  {
-                    \"instruction\": \"Verify which value wins by using the debug module in a playbook.\",
-                    \"command\": \"- name: check variable value\\n  debug:\\n    msg: \\\"Value is {{ my_var }}\\\"\"
-                  }
-                ]"
-    answer_a="Variables defined in a playbook vars: section"
-    answer_b="Variables defined in group_vars files"
-    answer_c="Variables defined in host_vars files"
-    answer_d="Variables passed on the command line with -e key=value"  # Correct answer
-    ;;
+    echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
 esac
 
-# Put answers in an array
-answers=("\"answer_a\":\"$answer_a\"" "\"answer_b\":\"$answer_b\"" "\"answer_c\":\"$answer_c\"" "\"answer_d\":\"$answer_d\"")
+instructions=$(jq -n \
+  --arg inst1 "$inst1" --arg cmd1 "$cmd1" \
+  --arg inst2 "$inst2" --arg cmd2 "$cmd2" \
+  --arg inst3 "$inst3" --arg cmd3 "$cmd3" \
+  '[
+    {"instruction": $inst1, "command": $cmd1},
+    {"instruction": $inst2, "command": $cmd2},
+    {"instruction": $inst3, "command": $cmd3}
+  ]')
 
-# Shuffle the answers to avoid predictable order
-shuffled_answers=$(printf "%s\n" "${answers[@]}" | shuf | paste -sd,)
-
-# Build the display JSON
-display='{
-  "question": "'"$question"'",
-  "type": "multi",
-  "answers": {
-    '"$shuffled_answers"'
-  },
-  "hint": "'"$hint"'",
-  "instructions": '"$instructions"',
-  "solution": "'"$answer_d"'",
-  "plateforme_required": "server",
-  "os_required": "ubuntu"
-}'
-
-# Pretty print the JSON output
-echo "$display" | jq .
+jq -n --indent 4 \
+  --arg question "$question" \
+  --arg hint "$hint" \
+  --argjson instructions "$instructions" \
+  '{
+    "question": $question,
+    "plateforme_required": "container",
+    "os_required": "ubuntu",
+    "type": "button",
+    "hint": $hint,
+    "instructions": $instructions,
+    "text": "Check",
+    "tags": "ansible,facts,gather_facts,debug,playbook"
+  }'

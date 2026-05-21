@@ -1,91 +1,68 @@
 #!/bin/bash
+if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
+lang="${1:-en}"
 
-# Check if "debug" is passed as an argument
-if [[ "$1" == "debug" ]]; then
-  set -eoux
-  shift
-fi
+pb_path="/home/ansible_user/workspace/multi_task.yml"
 
-# Language argument
-lang="${1:-en}" # Default to English if no language is specified
+cmd1='```yaml
+---
+- name: full web server setup
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: install package
+      package:
+        name: "{{ pkg_name }}"
+        state: present
+    - name: start and enable service
+      service:
+        name: "{{ pkg_name }}"
+        state: started
+        enabled: yes
+    - name: create index.html
+      copy:
+        content: "Welcome"
+        dest: /var/www/html/index.html
+```'
+cmd2="ansible-playbook /home/ansible_user/workspace/multi_task.yml"
 
-# Define the question, hint, instructions, and answers based on the language
 case "$lang" in
-  "en")
-    question="Which command lets you READ the contents of an ansible-vault encrypted file without permanently decrypting it on disk?"
-    hint="Try creating a small vault file and test each command. One sub-command opens the file in read-only mode without writing a decrypted copy to disk."
-    instructions="[
-                  {
-                    \"instruction\": \"Create a test vault file, then try the correct command to read it safely.\",
-                    \"command\": \"# Create a vault file (password: test123):\\nansible-vault create secrets.yaml\\n\\n# Now try reading it without decrypting to disk:\\nansible-vault view secrets.yaml\"
-                  },
-                  {
-                    \"instruction\": \"<span class=\\\"bold-green-text\\\">ansible-vault view</span> prompts for the password and displays the content — the file stays encrypted on disk. <span class=\\\"bold-green-text\\\">ansible-vault decrypt</span> writes a permanently decrypted copy.\",
-                    \"command\": \"# Compare: decrypt writes plaintext to disk (dangerous):\\nansible-vault decrypt secrets.yaml\\n\\n# view shows content safely without touching the file:\\nansible-vault view secrets.yaml\"
-                  }
-                ]"
-    answer_a="ansible-vault decrypt secrets.yaml"
-    answer_b="ansible-vault view secrets.yaml"  # Correct answer
-    answer_c="ansible-vault read secrets.yaml"
-    answer_d="ansible-vault show secrets.yaml"
+  en)
+    question="Write a playbook at \`$pb_path\` for \`webservers\` that: installs the \`pkg_name\` package, starts and enables the service with the same name, and creates \`/var/www/html/index.html\` with content \`Welcome\`. Then run it."
+    hint="You need three tasks: package (or yum/apt), service, and copy. All need become: yes. The service name is the same as pkg_name (nginx)."
+    inst1="Create the playbook with three tasks — <span class=\"bold-green-text\">package</span> to install, <span class=\"bold-green-text\">service</span> to start and enable, and <span class=\"bold-green-text\">copy</span> to create the index file:"
+    inst2="Run the playbook against all <span class=\"bold-green-text\">webservers</span> hosts:"
     ;;
-  "fr")
-    question="Quelle commande permet de LIRE le contenu d'un fichier chiffré par ansible-vault sans le déchiffrer définitivement sur le disque ?"
-    hint="Essayez de créer un petit fichier vault et testez chaque commande. Une sous-commande ouvre le fichier en lecture seule sans écrire de copie déchiffrée sur le disque."
-    instructions="[
-                  {
-                    \"instruction\": \"Créez un fichier vault de test, puis essayez la bonne commande pour le lire en toute sécurité.\",
-                    \"command\": \"# Créer un fichier vault (mot de passe : test123) :\\nansible-vault create secrets.yaml\\n\\n# Lire le fichier sans le déchiffrer sur le disque :\\nansible-vault view secrets.yaml\"
-                  },
-                  {
-                    \"instruction\": \"<span class=\\\"bold-green-text\\\">ansible-vault view</span> demande le mot de passe et affiche le contenu — le fichier reste chiffré sur le disque. <span class=\\\"bold-green-text\\\">ansible-vault decrypt</span> écrit une copie définitivement déchiffrée.\",
-                    \"command\": \"# Comparaison : decrypt écrit le texte clair sur le disque (dangereux) :\\nansible-vault decrypt secrets.yaml\\n\\n# view affiche le contenu en toute sécurité sans modifier le fichier :\\nansible-vault view secrets.yaml\"
-                  }
-                ]"
-    answer_a="ansible-vault decrypt secrets.yaml"
-    answer_b="ansible-vault view secrets.yaml"  # Correct answer
-    answer_c="ansible-vault read secrets.yaml"
-    answer_d="ansible-vault show secrets.yaml"
+  fr)
+    question="Écrivez un playbook à \`$pb_path\` pour \`webservers\` qui : installe le paquet \`pkg_name\`, démarre et active le service du même nom, et crée \`/var/www/html/index.html\` avec le contenu \`Welcome\`. Puis exécutez-le."
+    hint="Vous avez besoin de trois tâches : package (ou yum/apt), service et copy. Toutes nécessitent become: yes. Le nom du service est identique à pkg_name (nginx)."
+    inst1="Créez le playbook avec trois tâches — <span class=\"bold-green-text\">package</span> pour installer, <span class=\"bold-green-text\">service</span> pour démarrer et activer, et <span class=\"bold-green-text\">copy</span> pour créer le fichier index :"
+    inst2="Exécutez le playbook sur tous les hôtes <span class=\"bold-green-text\">webservers</span> :"
     ;;
   *)
-    question="Which command lets you READ the contents of an ansible-vault encrypted file without permanently decrypting it on disk?"
-    hint="Try creating a small vault file and test each command. One sub-command opens the file in read-only mode without writing a decrypted copy to disk."
-    instructions="[
-                  {
-                    \"instruction\": \"Create a test vault file, then try the correct command to read it safely.\",
-                    \"command\": \"# Create a vault file (password: test123):\\nansible-vault create secrets.yaml\\n\\n# Now try reading it without decrypting to disk:\\nansible-vault view secrets.yaml\"
-                  },
-                  {
-                    \"instruction\": \"<span class=\\\"bold-green-text\\\">ansible-vault view</span> prompts for the password and displays the content — the file stays encrypted on disk. <span class=\\\"bold-green-text\\\">ansible-vault decrypt</span> writes a permanently decrypted copy.\",
-                    \"command\": \"# Compare: decrypt writes plaintext to disk (dangerous):\\nansible-vault decrypt secrets.yaml\\n\\n# view shows content safely without touching the file:\\nansible-vault view secrets.yaml\"
-                  }
-                ]"
-    answer_a="ansible-vault decrypt secrets.yaml"
-    answer_b="ansible-vault view secrets.yaml"  # Correct answer
-    answer_c="ansible-vault read secrets.yaml"
-    answer_d="ansible-vault show secrets.yaml"
-    ;;
+    echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
 esac
 
-# Put answers in an array
-answers=("\"answer_a\":\"$answer_a\"" "\"answer_b\":\"$answer_b\"" "\"answer_c\":\"$answer_c\"" "\"answer_d\":\"$answer_d\"")
+# Handle the case user skipped adding pkg_name group variable (q67)
+if ! grep -q "pkg_name" /home/ansible_user/workspace/inventory 2>/dev/null; then
+  grep -q '\[webservers:vars\]' /home/ansible_user/workspace/inventory || printf '\n[webservers:vars]\n' >> /home/ansible_user/workspace/inventory
+  echo 'pkg_name=nginx' >> /home/ansible_user/workspace/inventory
+fi
 
-# Shuffle the answers to avoid predictable order
-shuffled_answers=$(printf "%s\n" "${answers[@]}" | shuf | paste -sd,)
+instructions=$(jq -n --arg inst1 "$inst1" --arg cmd1 "$cmd1" --arg inst2 "$inst2" --arg cmd2 "$cmd2" \
+  '[{"instruction": $inst1, "command": $cmd1}, {"instruction": $inst2, "command": $cmd2}]')
 
-# Build the display JSON
-display='{
-  "question": "'"$question"'",
-  "type": "multi",
-  "answers": {
-    '"$shuffled_answers"'
-  },
-  "hint": "'"$hint"'",
-  "instructions": '"$instructions"',
-  "solution": "'"$answer_b"'",
-  "plateforme_required": "container",
-  "os_required": "ubuntu"
-}'
-
-# Pretty print the JSON output
-echo "$display" | jq .
+jq -n --indent 4 \
+  --arg question "$question" \
+  --arg hint "$hint" \
+  --argjson instructions "$instructions" \
+  '{
+    "question": $question,
+    "plateforme_required": "container",
+    "os_required": "ubuntu",
+    "type": "button",
+    "hint": $hint,
+    "instructions": $instructions,
+    "text": "Check",
+    "tags": "ansible,service,package,copy,playbook"
+  }'

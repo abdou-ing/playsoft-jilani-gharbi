@@ -10,7 +10,7 @@ fi
 lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
-output_file="/home/ansible_user/uptime.txt"
+output_file="/home/ansible_user/workspace/uptime.txt"
 
 declare -A messages_en=(
   ["no_file"]="File not found at $output_file. Run: ansible webservers -m command -a 'uptime' > ~/uptime.txt"

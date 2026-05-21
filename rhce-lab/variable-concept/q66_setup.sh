@@ -1,91 +1,97 @@
 #!/bin/bash
+if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
+lang="${1:-en}"
 
-# Check if "debug" is passed as an argument
-if [[ "$1" == "debug" ]]; then
-  set -eoux
-  shift
+pb_path="/home/ansible_user/workspace/copy_demo.yml"
+inventory_path="/home/ansible_user/workspace/inventory"
+
+# Skip-q60 guard
+if [ ! -f "$inventory_path" ]; then
+  mkdir -p /home/ansible_user/workspace
+  printf '[webservers]\nweb1\nweb2\n\n[dbservers]\nbd1\n\n[all:vars]\nansible_user=ansible_user\n' \
+    > "$inventory_path"
+fi
+for entry in "10.30.0.11 web1" "10.30.0.12 web2" "10.30.0.13 bd1"; do
+  grep -qF "${entry%% *}" /etc/hosts 2>/dev/null || \
+    printf '%s\n' "$entry" | sudo tee -a /etc/hosts >/dev/null 2>&1 || true
+done
+if [ ! -f "/home/ansible_user/.ssh/id_rsa" ]; then
+  ssh-keygen -t rsa -b 2048 -f /home/ansible_user/.ssh/id_rsa -N "" >/dev/null 2>&1
+  for _h in web1 web2 bd1; do
+    SSHPASS='Labby123' sshpass -e ssh-copy-id -o StrictHostKeyChecking=no \
+      -i /home/ansible_user/.ssh/id_rsa.pub ansible_user@"$_h" >/dev/null 2>&1 || true
+  done
 fi
 
-# Language argument
-lang="${1:-en}" # Default to English if no language is specified
+# Create the source file inside the container
+_PODMAN="sudo -u student env XDG_RUNTIME_DIR=/run/user/1000 podman"
+if $_PODMAN ps --format '{{.Names}}' 2>/dev/null | grep -q "^control-node$"; then
+  $_PODMAN exec control-node bash -c "
+    mkdir -p /home/ansible_user/workspace/files
+    printf 'Managed by Ansible\n' > /home/ansible_user/workspace/files/hello.txt
+  "
+fi
 
-# Define the question, hint, instructions, and answers based on the language
+cmd1='```yaml
+---
+- name: copy file to webservers
+  hosts: webservers
+  tasks:
+    - name: copy hello.txt to managed hosts
+      copy:
+        src: files/hello.txt
+        dest: /home/ansible_user/workspace/hello.txt
+        mode: "0644"
+```'
+
+cmd2='```bash
+ansible-playbook -i '"$inventory_path $pb_path"'
+```'
+
+cmd3='```bash
+ansible webservers -i '"$inventory_path"' -m command -a '"'"'cat /home/ansible_user/workspace/hello.txt'"'"'
+```'
+
 case "$lang" in
-  "en")
-    question="Which Ansible magic variable contains ALL hosts in the inventory together with their assigned variables?"
-    hint="Magic variables are set automatically by Ansible. One of them acts as a dictionary of every host — useful when you need to read a variable from a different host inside a running task."
-    instructions="[
-                  {
-                    \"instruction\": \"Use <span class=\\\"bold-green-text\\\">hostvars</span> to access a variable from another host while a task is running on the current host.\",
-                    \"command\": \"# Read ansible2's IP address from a task running on ansible1:\\n{{ hostvars['ansible2']['ansible_default_ipv4']['address'] }}\\n\\n# Inspect hostvars for a host via ad-hoc command:\\nansible localhost -m debug -a 'var=hostvars[\\\"ansible1\\\"]'\"
-                  },
-                  {
-                    \"instruction\": \"Other key magic variables and their purpose.\",
-                    \"command\": \"# groups           -> all groups in inventory\\n# group_names     -> groups the current host belongs to\\n# inventory_hostname -> current host's inventory name\"
-                  }
-                ]"
-    answer_a="hostvars"  # Correct answer
-    answer_b="groups"
-    answer_c="group_names"
-    answer_d="inventory_hostname"
+  en)
+    question="Write a playbook at \`$pb_path\` that uses the \`copy\` module to copy \`files/hello.txt\` from the control node to \`/tmp/hello.txt\` on all \`webservers\` hosts. Run it and verify the file is present."
+    hint="The copy module uses src: (path on the control node, relative to the playbook) and dest: (absolute path on the managed host). No become: needed since the destination is inside ansible_user's home directory."
+    inst1="Create the playbook at <span class=\"bold-green-text\">$pb_path</span> using the <span class=\"bold-green-text\">copy</span> module — <span class=\"bold-green-text\">src:</span> is the path on the control node, <span class=\"bold-green-text\">dest:</span> is where it lands on each managed host:"
+    inst2="Run the playbook to push the file to all webservers:"
+    inst3="Verify the file arrived on the managed hosts at <span class=\"bold-green-text\">/home/ansible_user/workspace/hello.txt</span>:"
     ;;
-  "fr")
-    question="Quelle variable magique Ansible contient TOUS les hôtes de l'inventaire avec leurs variables assignées ?"
-    hint="Les variables magiques sont définies automatiquement par Ansible. L'une d'elles agit comme un dictionnaire de tous les hôtes — utile pour lire une variable d'un autre hôte depuis une tâche en cours."
-    instructions="[
-                  {
-                    \"instruction\": \"Utilisez <span class=\\\"bold-green-text\\\">hostvars</span> pour accéder à une variable d'un autre hôte pendant qu'une tâche s'exécute sur l'hôte courant.\",
-                    \"command\": \"# Lire l'adresse IP de ansible2 depuis une tâche sur ansible1 :\\n{{ hostvars['ansible2']['ansible_default_ipv4']['address'] }}\\n\\n# Inspecter hostvars via une commande ad-hoc :\\nansible localhost -m debug -a 'var=hostvars[\\\"ansible1\\\"]'\"
-                  },
-                  {
-                    \"instruction\": \"Autres variables magiques importantes et leur rôle.\",
-                    \"command\": \"# groups           -> tous les groupes de l'inventaire\\n# group_names     -> groupes dont fait partie l'hôte courant\\n# inventory_hostname -> nom de l'hôte courant dans l'inventaire\"
-                  }
-                ]"
-    answer_a="hostvars"  # Correct answer
-    answer_b="groups"
-    answer_c="group_names"
-    answer_d="inventory_hostname"
+  fr)
+    question="Écrivez un playbook à \`$pb_path\` qui utilise le module \`copy\` pour copier \`files/hello.txt\` du nœud de contrôle vers \`/tmp/hello.txt\` sur tous les hôtes \`webservers\`. Exécutez-le et vérifiez que le fichier est présent."
+    hint="Le module copy utilise src: (chemin sur le nœud de contrôle, relatif au playbook) et dest: (chemin absolu sur l'hôte géré). Pas besoin de become: car la destination est dans le répertoire personnel de ansible_user."
+    inst1="Créez le playbook à <span class=\"bold-green-text\">$pb_path</span> avec le module <span class=\"bold-green-text\">copy</span> — <span class=\"bold-green-text\">src:</span> est le chemin sur le nœud de contrôle, <span class=\"bold-green-text\">dest:</span> est l'emplacement sur chaque hôte géré :"
+    inst2="Exécutez le playbook pour envoyer le fichier sur tous les webservers :"
+    inst3="Vérifiez que le fichier est arrivé sur les hôtes gérés à <span class=\"bold-green-text\">/home/ansible_user/workspace/hello.txt</span> :"
     ;;
   *)
-    question="Which Ansible magic variable contains ALL hosts in the inventory together with their assigned variables?"
-    hint="Magic variables are set automatically by Ansible. One of them acts as a dictionary of every host — useful when you need to read a variable from a different host inside a running task."
-    instructions="[
-                  {
-                    \"instruction\": \"Use <span class=\\\"bold-green-text\\\">hostvars</span> to access a variable from another host while a task is running on the current host.\",
-                    \"command\": \"# Read ansible2's IP address from a task running on ansible1:\\n{{ hostvars['ansible2']['ansible_default_ipv4']['address'] }}\\n\\n# Inspect hostvars for a host via ad-hoc command:\\nansible localhost -m debug -a 'var=hostvars[\\\"ansible1\\\"]'\"
-                  },
-                  {
-                    \"instruction\": \"Other key magic variables and their purpose.\",
-                    \"command\": \"# groups           -> all groups in inventory\\n# group_names     -> groups the current host belongs to\\n# inventory_hostname -> current host's inventory name\"
-                  }
-                ]"
-    answer_a="hostvars"  # Correct answer
-    answer_b="groups"
-    answer_c="group_names"
-    answer_d="inventory_hostname"
-    ;;
+    echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
 esac
 
-# Put answers in an array
-answers=("\"answer_a\":\"$answer_a\"" "\"answer_b\":\"$answer_b\"" "\"answer_c\":\"$answer_c\"" "\"answer_d\":\"$answer_d\"")
+instructions=$(jq -n \
+  --arg inst1 "$inst1" --arg cmd1 "$cmd1" \
+  --arg inst2 "$inst2" --arg cmd2 "$cmd2" \
+  --arg inst3 "$inst3" --arg cmd3 "$cmd3" \
+  '[
+    {"instruction": $inst1, "command": $cmd1},
+    {"instruction": $inst2, "command": $cmd2},
+    {"instruction": $inst3, "command": $cmd3}
+  ]')
 
-# Shuffle the answers to avoid predictable order
-shuffled_answers=$(printf "%s\n" "${answers[@]}" | shuf | paste -sd,)
-
-# Build the display JSON
-display='{
-  "question": "'"$question"'",
-  "type": "multi",
-  "answers": {
-    '"$shuffled_answers"'
-  },
-  "hint": "'"$hint"'",
-  "instructions": '"$instructions"',
-  "solution": "'"$answer_a"'",
-  "plateforme_required": "server",
-  "os_required": "ubuntu"
-}'
-
-# Pretty print the JSON output
-echo "$display" | jq .
+jq -n --indent 4 \
+  --arg question "$question" \
+  --arg hint "$hint" \
+  --argjson instructions "$instructions" \
+  '{
+    "question": $question,
+    "plateforme_required": "container",
+    "os_required": "ubuntu",
+    "type": "button",
+    "hint": $hint,
+    "instructions": $instructions,
+    "text": "Check",
+    "tags": "ansible,copy,module,playbook,files"
+  }'

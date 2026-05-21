@@ -10,7 +10,7 @@ fi
 lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
-pb_path="/home/ansible_user/motd.yml"
+pb_path="/home/ansible_user/workspace/motd.yml"
 
 declare -A messages_en=(
   ["no_file"]="Playbook not found at $pb_path. Create it first."

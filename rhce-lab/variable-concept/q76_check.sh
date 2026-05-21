@@ -10,24 +10,26 @@ fi
 lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
-pb_path="/home/ansible_user/create_user.yml"
+pb_path="/home/ansible_user/workspace/full_setup.yml"
 
 
 declare -A messages_en=(
   ["no_file"]="Playbook not found at $pb_path. Create it first."
   ["no_webservers"]="The playbook does not target 'webservers'. Set hosts: webservers."
-  ["no_user_module"]="The playbook does not use the user module. Add a task with user: name: devops state: present"
-  ["no_devops"]="The playbook does not reference the 'devops' user. Check the name: field in your user task."
+  ["no_become"]="The playbook is missing 'become: yes'. Add it at the play level."
+  ["no_enabled"]="The playbook does not set 'enabled: yes' on the service task. The service must be enabled at boot."
   ["syntax_error"]="The playbook has a syntax error. Run: ansible-playbook --syntax-check $pb_path"
-  ["user_missing"]="User 'devops' does not exist on web1. Run the playbook: ansible-playbook $pb_path"
+  ["not_active"]="nginx is not running on web1. Run the playbook: ansible-playbook $pb_path"
+  ["not_enabled"]="nginx is not enabled at boot on web1. Make sure the service task has enabled: yes"
 )
 declare -A messages_fr=(
   ["no_file"]="Playbook introuvable à $pb_path. Créez-le d'abord."
   ["no_webservers"]="Le playbook ne cible pas 'webservers'. Définissez hosts: webservers."
-  ["no_user_module"]="Le playbook n'utilise pas le module user. Ajoutez une tâche avec user: name: devops state: present"
-  ["no_devops"]="Le playbook ne référence pas l'utilisateur 'devops'. Vérifiez le champ name: dans votre tâche user."
+  ["no_become"]="Le playbook manque 'become: yes'. Ajoutez-le au niveau du play."
+  ["no_enabled"]="Le playbook ne définit pas 'enabled: yes' sur la tâche service. Le service doit être activé au démarrage."
   ["syntax_error"]="Le playbook contient une erreur de syntaxe. Exécutez : ansible-playbook --syntax-check $pb_path"
-  ["user_missing"]="L'utilisateur 'devops' n'existe pas sur web1. Exécutez le playbook : ansible-playbook $pb_path"
+  ["not_active"]="nginx ne fonctionne pas sur web1. Exécutez le playbook : ansible-playbook $pb_path"
+  ["not_enabled"]="nginx n'est pas activé au démarrage sur web1. Assurez-vous que la tâche service a enabled: yes"
 )
 
 get_message() { declare -n _m="messages_$lang"; echo "{\"result\": \"${_m[$1]}\"}"; }
@@ -40,20 +42,24 @@ if ! grep -q "webservers" "$pb_path"; then
   echo "$(get_message no_webservers)"; exit 0
 fi
 
-if ! grep -q "user:" "$pb_path"; then
-  echo "$(get_message no_user_module)"; exit 0
+if ! grep -q "become:" "$pb_path"; then
+  echo "$(get_message no_become)"; exit 0
 fi
 
-if ! grep -q "devops" "$pb_path"; then
-  echo "$(get_message no_devops)"; exit 0
+if ! grep -q "enabled:" "$pb_path"; then
+  echo "$(get_message no_enabled)"; exit 0
 fi
 
 if ! ansible-playbook --syntax-check "$pb_path" &>/dev/null; then
   echo "$(get_message syntax_error)"; exit 0
 fi
 
-if ! ansible web1 -m command -a "id devops" 2>/dev/null | grep -q "uid="; then
-  echo "$(get_message user_missing)"; exit 0
+if ! ansible web1 -m command -a "systemctl is-active nginx" 2>/dev/null | grep -q "active"; then
+  echo "$(get_message not_active)"; exit 0
+fi
+
+if ! ansible web1 -m command -a "systemctl is-enabled nginx" 2>/dev/null | grep -q "enabled"; then
+  echo "$(get_message not_enabled)"; exit 0
 fi
 
 echo '{"result": "0"}'

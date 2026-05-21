@@ -10,7 +10,7 @@ fi
 lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
-inventory_path="/home/ansible_user/inventory"
+inventory_path="/home/ansible_user/workspace/inventory"
 
 declare -A messages_en=(
   ["no_file"]="Inventory file not found at $inventory_path."

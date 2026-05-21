@@ -1,91 +1,54 @@
 #!/bin/bash
+if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
+lang="${1:-en}"
 
-# Check if "debug" is passed as an argument
-if [[ "$1" == "debug" ]]; then
-  set -eoux
-  shift
-fi
+pb_path="/home/ansible_user/workspace/check_disk.yml"
 
-# Language argument
-lang="${1:-en}" # Default to English if no language is specified
+cmd1='```yaml
+---
+- name: check disk usage
+  hosts: webservers
+  tasks:
+    - name: run df -h
+      command: df -h
+      register: disk_info
+    - name: print disk info
+      debug:
+        var: disk_info.stdout_lines
+```'
+cmd2="ansible-playbook /home/ansible_user/workspace/check_disk.yml"
 
-# Define the question, hint, instructions, and answers based on the language
 case "$lang" in
-  "en")
-    question="Which ansible command lets you verify whether user 'charlie' exists on ALL managed hosts?"
-    hint="Try each command on your control node. The correct one runs a native Linux command on every host and returns the result for each."
-    instructions="[
-                  {
-                    \"instruction\": \"Use the <span class=\\\"bold-green-text\\\">command</span> module with <span class=\\\"bold-green-text\\\">id charlie</span> to probe each host. A SUCCESS result means the user exists; a FAILED result means it does not.\",
-                    \"command\": \"ansible all -m command -a 'id charlie'\"
-                  },
-                  {
-                    \"instruction\": \"Compare the output across hosts to identify on which server charlie exists.\",
-                    \"command\": \"# charlie exists on ansible1:\\nansible1 | CHANGED | rc=0 >>\\nuid=1001(charlie) gid=1001(charlie) groups=1001(charlie)\\n\\n# charlie does not exist on ansible2:\\nansible2 | FAILED | rc=1 >>\\nid: charlie: no such user\"
-                  }
-                ]"
-    answer_a="ansible all -m user -a 'name=charlie state=present'"
-    answer_b="ansible all -u charlie -m ping"
-    answer_c="ansible all -m setup -a 'filter=ansible_user_id'"
-    answer_d="ansible all -m command -a 'id charlie'"  # Correct answer
+  en)
+    question="Write a playbook at \`$pb_path\` that runs \`df -h\` on all \`webservers\` hosts, stores the output in a variable called \`disk_info\` using \`register:\`, and then prints it using the \`debug\` module. Run the playbook."
+    hint="Use the command module to run df -h, then register: disk_info to capture the output. The debug module can print it with var: disk_info.stdout_lines"
+    inst1="Create the playbook using the <span class=\"bold-green-text\">command</span> module to run <span class=\"bold-green-text\">df -h</span>, capture the output with <span class=\"bold-green-text\">register: disk_info</span>, and print it with the <span class=\"bold-green-text\">debug</span> module:"
+    inst2="Run the playbook and check that <span class=\"bold-green-text\">disk_info.stdout_lines</span> appears in the output for each host:"
     ;;
-  "fr")
-    question="Quelle commande ansible permet de vérifier si l'utilisateur 'charlie' existe sur TOUS les hôtes gérés ?"
-    hint="Essayez chaque commande sur votre nœud de contrôle. La bonne exécute une commande Linux native sur chaque hôte et retourne le résultat pour chacun."
-    instructions="[
-                  {
-                    \"instruction\": \"Utilisez le module <span class=\\\"bold-green-text\\\">command</span> avec <span class=\\\"bold-green-text\\\">id charlie</span> pour interroger chaque hôte. Un résultat SUCCESS signifie que l'utilisateur existe ; un résultat FAILED signifie qu'il n'existe pas.\",
-                    \"command\": \"ansible all -m command -a 'id charlie'\"
-                  },
-                  {
-                    \"instruction\": \"Comparez la sortie entre les hôtes pour identifier sur quel serveur charlie existe.\",
-                    \"command\": \"# charlie existe sur ansible1 :\\nansible1 | CHANGED | rc=0 >>\\nuid=1001(charlie) gid=1001(charlie) groups=1001(charlie)\\n\\n# charlie n'existe pas sur ansible2 :\\nansible2 | FAILED | rc=1 >>\\nid: charlie: no such user\"
-                  }
-                ]"
-    answer_a="ansible all -m user -a 'name=charlie state=present'"
-    answer_b="ansible all -u charlie -m ping"
-    answer_c="ansible all -m setup -a 'filter=ansible_user_id'"
-    answer_d="ansible all -m command -a 'id charlie'"  # Correct answer
+  fr)
+    question="Écrivez un playbook à \`$pb_path\` qui exécute \`df -h\` sur tous les hôtes \`webservers\`, stocke la sortie dans une variable nommée \`disk_info\` avec \`register:\`, puis l'affiche avec le module \`debug\`. Exécutez le playbook."
+    hint="Utilisez le module command pour exécuter df -h, puis register: disk_info pour capturer la sortie. Le module debug peut l'afficher avec var: disk_info.stdout_lines"
+    inst1="Créez le playbook avec le module <span class=\"bold-green-text\">command</span> pour exécuter <span class=\"bold-green-text\">df -h</span>, capturez la sortie avec <span class=\"bold-green-text\">register: disk_info</span> et affichez-la avec le module <span class=\"bold-green-text\">debug</span> :"
+    inst2="Exécutez le playbook et vérifiez que <span class=\"bold-green-text\">disk_info.stdout_lines</span> apparaît dans la sortie pour chaque hôte :"
     ;;
   *)
-    question="Which ansible command lets you verify whether user 'charlie' exists on ALL managed hosts?"
-    hint="Try each command on your control node. The correct one runs a native Linux command on every host and returns the result for each."
-    instructions="[
-                  {
-                    \"instruction\": \"Use the <span class=\\\"bold-green-text\\\">command</span> module with <span class=\\\"bold-green-text\\\">id charlie</span> to probe each host. A SUCCESS result means the user exists; a FAILED result means it does not.\",
-                    \"command\": \"ansible all -m command -a 'id charlie'\"
-                  },
-                  {
-                    \"instruction\": \"Compare the output across hosts to identify on which server charlie exists.\",
-                    \"command\": \"# charlie exists on ansible1:\\nansible1 | CHANGED | rc=0 >>\\nuid=1001(charlie) gid=1001(charlie) groups=1001(charlie)\\n\\n# charlie does not exist on ansible2:\\nansible2 | FAILED | rc=1 >>\\nid: charlie: no such user\"
-                  }
-                ]"
-    answer_a="ansible all -m user -a 'name=charlie state=present'"
-    answer_b="ansible all -u charlie -m ping"
-    answer_c="ansible all -m setup -a 'filter=ansible_user_id'"
-    answer_d="ansible all -m command -a 'id charlie'"  # Correct answer
-    ;;
+    echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
 esac
 
-# Put answers in an array
-answers=("\"answer_a\":\"$answer_a\"" "\"answer_b\":\"$answer_b\"" "\"answer_c\":\"$answer_c\"" "\"answer_d\":\"$answer_d\"")
+instructions=$(jq -n --arg inst1 "$inst1" --arg cmd1 "$cmd1" --arg inst2 "$inst2" --arg cmd2 "$cmd2" \
+  '[{"instruction": $inst1, "command": $cmd1}, {"instruction": $inst2, "command": $cmd2}]')
 
-# Shuffle the answers to avoid predictable order
-shuffled_answers=$(printf "%s\n" "${answers[@]}" | shuf | paste -sd,)
-
-# Build the display JSON
-display='{
-  "question": "'"$question"'",
-  "type": "multi",
-  "answers": {
-    '"$shuffled_answers"'
-  },
-  "hint": "'"$hint"'",
-  "instructions": '"$instructions"',
-  "solution": "'"$answer_d"'",
-  "plateforme_required": "container",
-  "os_required": "ubuntu"
-}'
-
-# Pretty print the JSON output
-echo "$display" | jq .
+jq -n --indent 4 \
+  --arg question "$question" \
+  --arg hint "$hint" \
+  --argjson instructions "$instructions" \
+  '{
+    "question": $question,
+    "plateforme_required": "container",
+    "os_required": "ubuntu",
+    "type": "button",
+    "hint": $hint,
+    "instructions": $instructions,
+    "text": "Check",
+    "tags": "ansible,register,debug,playbook"
+  }'

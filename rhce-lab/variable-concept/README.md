@@ -1,7 +1,7 @@
 # Variable Concept — Question Bank
 
-This folder contains **42 questions** (q59–q100) covering Ansible fundamentals:
-variables, facts, ansible.cfg, inventory, ad-hoc commands, playbooks, and privilege escalation.
+This folder contains **19 questions** (q59–q77) covering Ansible fundamentals:
+connectivity setup, variables, facts, inventory, ad-hoc commands, playbooks, and privilege escalation.
 
 ---
 
@@ -16,139 +16,93 @@ variables, facts, ansible.cfg, inventory, ad-hoc commands, playbooks, and privil
 
 ## Question Index
 
-### Block 1 — Variables & Facts Theory (q59–q68) · `multi`
+### q59 — `multi`
 
-| # | Topic | Correct answer |
-|---|---|---|
-| q59 | Three types of Ansible variables | fact, variable, magic variable |
-| q60 | Invalid variable name (hyphen rule) | `my-package` is invalid |
-| q61 | Where gathered facts are stored | `ansible_facts` |
-| q62 | Preferred notation for facts | Square brackets: `ansible_facts['hostname']` |
-| q63 | Highest variable precedence | `-e key=value` on command line |
-| q64 | Custom facts directory on managed hosts | `/etc/ansible/facts.d` |
-| q65 | Play header to disable fact gathering | `gather_facts: no` |
-| q66 | Magic variable containing all hosts + vars | `hostvars` |
-| q67 | When to wrap variable reference in quotes | When value starts with `{{` |
-| q68 | ansible-vault command to change password | `rekey` |
+| # | Topic |
+|---|---|
+| q59 | Ansible version installed on the control node |
 
 ---
 
-### Block 2 — Broken Playbook: Find the Bug (q69–q71) · `multi`
+### q60 — Environment Setup & Connectivity · `button`
 
-The broken YAML is shown **directly in the question**. The student reads it and picks the correct diagnosis.
-
-| # | Bug in the playbook | Correct answer |
-|---|---|---|
-| q69 | `name: {{ pkg_name }}` — missing double quotes | Variable reference needs quotes |
-| q70 | `web-package:` / `web-service:` — hyphens in variable names | Hyphens not allowed in variable names |
-| q71 | `gather_facts: no` but task uses `ansible_facts['distribution']` | Facts disabled but task requires them |
-
----
-
-### Block 3 — Run a Command to Verify (q72–q75) · `multi`
-
-Student must run each option and observe the output to find the correct answer.
-
-| # | Task | Correct command |
-|---|---|---|
-| q72 | Verify custom facts on all hosts | `ansible all -m setup -a 'filter=ansible_local'` |
-| q73 | Read vault file without decrypting to disk | `ansible-vault view secrets.yaml` |
-| q74 | Find OS distribution of all managed hosts | `ansible all -m setup -a 'filter=ansible_distribution'` |
-| q75 | Verify if user charlie exists on all hosts | `ansible all -m command -a 'id charlie'` |
-
----
-
-### Block 4 — ansible.cfg & Inventory Basics (q76–q80) · `multi`
-
-| # | Topic | Correct answer |
-|---|---|---|
-| q76 | ansible.cfg section for inventory/roles/remote_user | `[defaults]` |
-| q77 | Inventory syntax for a group of groups | `[webservers:children]` |
-| q78 | ansible.cfg setting for SSH login username | `remote_user` |
-| q79 | What `become = true` does in ansible.cfg | Escalates to root via sudo |
-| q80 | Command that checks connectivity AND privilege escalation | `ansible all -a 'id'` |
-
----
-
-### Block 5 — Beginner Commands & Playbook Concepts (q81–q89) · `multi`
-
-| # | Topic | Correct answer |
-|---|---|---|
-| q81 | Command to show installed Ansible version | `ansible --version` |
-| q82 | Count hosts in a group (inventory shown in question) | 3 |
-| q83 | Module used for ad-hoc connectivity test | `ping` |
-| q84 | What `hosts:` defines in a playbook | Target group or hosts |
-| q85 | Module to copy file from control node to managed hosts | `copy` |
-| q86 | Default inventory file path | `/etc/ansible/hosts` |
-| q87 | Playbook keyword that labels a task | `name` |
-| q88 | Command to run a playbook | `ansible-playbook` |
-| q89 | What `become: yes` does in a playbook | Privilege escalation (sudo) |
-
-> **Note:** q89 and q79 cover the same `become` concept from different angles — q79 is the `ansible.cfg` config context, q89 is the playbook keyword context.
-
----
-
-### Block 6 — Hands-on Practice (q90–q100) · `button`
-
-Student performs the task in the terminal, then clicks **Check**. Each question has a corresponding `_check.sh` verification script.
-
-| # | Task | What the check verifies | Depends on |
+| # | Task | What the check verifies | Check file |
 |---|---|---|---|
-| q90 | Add `pkg_name=nginx` to `[webservers:vars]` in inventory | `[webservers:vars]` + `pkg_name=nginx` present | — |
-| q91 | Write & run `debug_vars.yml` → print `pkg_name` | File exists, uses `debug:`, references `pkg_name`, runs OK | q90 |
-| q92 | Write & run `install_pkg.yml` → install from `pkg_name` | nginx installed on web1 | q90 |
-| q93 | Ad-hoc `uptime` on webservers → save to `uptime.txt` | File exists with `load average` content | — |
-| q94 | Write & run `create_file.yml` → `/tmp/hello.txt` with `Hello from Ansible` | File content verified on web1 | — |
-| q95 | Write & run `create_user.yml` → create user `devops` | `id devops` succeeds on web1 | — |
-| q96 | Write & run `multi_task.yml` → install + start + `index.html` "Welcome" | nginx active + `/var/www/html/index.html` content | q90 |
-| q97 | Add `env=staging` to `[webservers:vars]` in inventory | `env=staging` present in inventory | q90 |
-| q98 | Write & run `check_disk.yml` → `df -h` + `register: disk_info` + debug | `register:`, `disk_info`, `debug:` all present, runs OK | — |
-| q99 | Write & run `full_setup.yml` → `become:yes` + install + start + enable | nginx active AND enabled on web1 | q90 |
-| q100 | Write & run `motd.yml` → `/etc/motd` with `Managed by Ansible` on all | `/etc/motd` content verified on web1 | — |
+| q60 | Configure `/etc/hosts`, create inventory, generate SSH key, `ssh-copy-id` to web1/web2/bd1, `ansible -m ping all` | Correct IPs in `/etc/hosts` · SSH key exists · `ansible ping` succeeds per host | `q60_check.sh` |
 
-#### Dependency chain
+> **Foundation question.** All subsequent `button` questions include a skip-q60 guard in their setup script that automatically recreates the inventory, `/etc/hosts` entries, and SSH keys if q60 was skipped.
+
+---
+
+### q61–q64 — Fix & Write Playbooks · `button`
+
+| # | Task | Playbook path | What the check verifies | Check file |
+|---|---|---|---|---|
+| q61 | Fix broken YAML quoting (`name: {{ pkg_name }}` → `name: "{{ pkg_name }}"`) and install `curl` on all hosts | `workspace/install_pkg.yml` | No unquoted `{{`, syntax OK, `curl` installed on web1 | `q61_check.sh` |
+| q62 | Write a playbook with a `vars:` section defining `greeting` and print it with `debug` on all hosts | `workspace/vars_demo.yml` | `vars:` present, `greeting` defined, `debug:` used, runs OK | `q62_check.sh` |
+| q63 | Write a playbook that displays `ansible_facts['distribution']` without `gather_facts: no` | `workspace/facts_demo.yml` | `debug:` present, `distribution` referenced, no `VARIABLE IS NOT DEFINED` | `q63_check.sh` |
+| q64 | Write a playbook targeting `webservers` that installs `tree` only when `ansible_os_family == "Debian"` | `workspace/when_demo.yml` | `when:` + `ansible_os_family` present, `become:` set, `tree` installed on web1 | `q64_check.sh` |
+
+---
+
+### q65 — Inventory: Group of Groups · `button`
+
+| # | Task | What the check verifies | Check file |
+|---|---|---|---|
+| q65 | Add `[all_servers:children]` to inventory with `webservers` and `dbservers` as child groups | Section present · both groups listed · `ansible all_servers --list-hosts` returns web1, web2, bd1 | `q65_check.sh` |
+
+> Setup resets the `[all_servers:children]` block each run so re-attempts start clean.
+
+---
+
+### q66 — File Transfer · `button`
+
+| # | Task | Playbook path | What the check verifies | Check file |
+|---|---|---|---|---|
+| q66 | Write a playbook that uses `copy` to push `files/hello.txt` to `/home/ansible_user/workspace/hello.txt` on `webservers` | `workspace/copy_demo.yml` | `copy:`, `src:`, `dest:` present · targets `webservers` · file exists on web1 and web2 | `q66_check.sh` |
+
+> Setup creates `workspace/files/hello.txt` inside the container before presenting the question.
+
+---
+
+### q67–q77 — Hands-on Practice · `button`
+
+| # | Task | Playbook / artifact path | What the check verifies | Depends on |
+|---|---|---|---|---|
+| q67 | Add `pkg_name=nginx` to `[webservers:vars]` in inventory | `inventory` | `[webservers:vars]` + `pkg_name=nginx` present | — |
+| q68 | Write & run `debug_vars.yml` → print `pkg_name` with `debug` | `workspace/debug_vars.yml` | File exists, uses `debug:`, references `pkg_name`, runs OK | q67 |
+| q69 | Write & run `install_pkg.yml` → install package from `pkg_name` variable | `workspace/install_pkg.yml` | nginx installed on web1 | q67 |
+| q70 | Ad-hoc `uptime` on webservers → save to `uptime.txt` | `workspace/uptime.txt` | File exists with `load average` content | — |
+| q71 | Write & run `create_file.yml` → `/tmp/hello.txt` with `Hello from Ansible` | `workspace/create_file.yml` | File content verified on web1 | — |
+| q72 | Write & run `create_user.yml` → create user `devops` | `workspace/create_user.yml` | `id devops` succeeds on web1 | — |
+| q73 | Write & run `multi_task.yml` → install + start nginx + write `index.html` "Welcome" | `workspace/multi_task.yml` | nginx active + `/var/www/html/index.html` content verified | q67 |
+| q74 | Add `env=staging` to `[webservers:vars]` in inventory | `inventory` | `env=staging` present in inventory | q67 |
+| q75 | Write & run `check_disk.yml` → `df -h` + `register: disk_info` + debug | `workspace/check_disk.yml` | `register:`, `disk_info`, `debug:` all present, runs OK | — |
+| q76 | Write & run `full_setup.yml` → install + start + enable nginx with `become: yes` | `workspace/full_setup.yml` | nginx active AND enabled on web1 | q67 |
+| q77 | Write & run `motd.yml` → `/etc/motd` with `Managed by Ansible` on all hosts | `workspace/motd.yml` | `/etc/motd` content verified on web1 | — |
+
+#### Dependency chain (q67–q77)
 
 ```
-q90  ──► q91   (pkg_name variable must exist)
-     ──► q92   (pkg_name variable must exist)  ──► q96 / q99  (nginx must be installed)
-     ──► q96   (pkg_name variable must exist)
-     ──► q97   ([webservers:vars] section must exist)
-     ──► q99   (pkg_name variable must exist)
+q67 ──► q68   (pkg_name must exist in inventory)
+    ──► q69   (pkg_name must exist)
+    ──► q73   (pkg_name must exist)
+    ──► q74   ([webservers:vars] section must exist)
+    ──► q76   (pkg_name must exist)
 
-q93, q94, q95, q98, q100  — fully independent, any order
+q70, q71, q72, q75, q77 — fully independent, any order
 ```
 
 #### Skip mechanism
 
-Every `_check.sh` accepts a `skip` argument. When the student skips a question, the check script **silently auto-performs the task** so downstream questions are not blocked.
-
-```bash
-# Called by the platform when student clicks Skip:
-./q90_check.sh skip        # English
-./q90_check.sh fr skip     # French
-```
-
-| Skipped | Auto-action |
-|---|---|
-| q90 | Appends `[webservers:vars]` + `pkg_name=nginx` to inventory |
-| q91 | Writes `debug_vars.yml` and runs it silently |
-| q92 | Writes `install_pkg.yml` and installs nginx silently |
-| q93 | Runs `uptime` ad-hoc and saves output to `uptime.txt` |
-| q94 | Writes `create_file.yml` and creates `/tmp/hello.txt` |
-| q95 | Writes `create_user.yml` and creates user `devops` |
-| q96 | Writes `multi_task.yml`, starts nginx, creates `index.html` |
-| q97 | Appends `env=staging` to `[webservers:vars]` in inventory |
-| q98 | Writes `check_disk.yml` and runs it silently |
-| q99 | Writes `full_setup.yml` and enables nginx at boot |
-| q100 | Writes `motd.yml` and writes `/etc/motd` on all hosts |
+Each `_setup.sh` patches missing prerequisites before outputting its question JSON. If a student skips q67, the next question's setup automatically appends the required inventory entries so no question is blocked.
 
 ---
 
-
 ## Summary
 
-| Category | Count |
-|---|---|
-| MCQ (`multi`) | 31 (q59–q89) |
-| Hands-on (`button`) | 11 (q90–q100) |
-| **Total** | **42** |
+| Category | Questions | Count |
+|---|---|---|
+| MCQ (`multi`) | q59 | 1 |
+| Hands-on (`button`) | q60–q66, q67–q77 | 18 |
+| **Total** | q59–q77 | **19** |

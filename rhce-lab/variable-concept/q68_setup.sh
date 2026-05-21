@@ -1,91 +1,57 @@
 #!/bin/bash
+if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
+lang="${1:-en}"
 
-# Check if "debug" is passed as an argument
-if [[ "$1" == "debug" ]]; then
-  set -eoux
-  shift
-fi
+pb_path="/home/ansible_user/workspace/debug_vars.yml"
 
-# Language argument
-lang="${1:-en}" # Default to English if no language is specified
+cmd1='```yaml
+---
+- name: print pkg_name variable
+  hosts: webservers
+  tasks:
+    - name: display pkg_name
+      debug:
+        var: pkg_name
+```'
+cmd2="ansible-playbook /home/ansible_user/workspace/debug_vars.yml"
 
-# Define the question, hint, instructions, and answers based on the language
 case "$lang" in
-  "en")
-    question="Which ansible-vault sub-command is used to change the password on an already-encrypted file?"
-    hint="ansible-vault has several sub-commands. One of them is specifically designed for rotating the encryption password on an existing vault file without decrypting it first."
-    instructions="[
-                  {
-                    \"instruction\": \"Use <span class=\\\"bold-green-text\\\">ansible-vault rekey</span> to change the password on an existing encrypted file.\",
-                    \"command\": \"ansible-vault rekey secrets.yaml\\n# Prompts for: current vault password\\n# Prompts for: new vault password\\n# Prompts for: confirm new vault password\"
-                  },
-                  {
-                    \"instruction\": \"All ansible-vault sub-commands at a glance.\",
-                    \"command\": \"ansible-vault create   secret.yaml  # new encrypted file\\nansible-vault encrypt  secret.yaml  # encrypt existing file\\nansible-vault decrypt  secret.yaml  # decrypt to plaintext\\nansible-vault rekey    secret.yaml  # change the password\\nansible-vault view     secret.yaml  # view without decrypting\\nansible-vault edit     secret.yaml  # edit in place\"
-                  }
-                ]"
-    answer_a="repass"
-    answer_b="rekey"  # Correct answer
-    answer_c="change-password"
-    answer_d="update"
+  en)
+    question="Write a playbook at \`$pb_path\` that runs on the \`webservers\` group and uses the \`debug\` module to print the value of the \`pkg_name\` variable."
+    hint="The debug module accepts either \`msg:\` with a Jinja2 expression or \`var:\` with a bare variable name. Make sure pkg_name is already set in your inventory as a group variable."
+    inst1="Use the <span class=\"bold-green-text\">debug</span> module with <span class=\"bold-green-text\">var:</span> to print the variable by name — no Jinja2 braces needed with this argument:"
+    inst2="Run the playbook and verify the value of <span class=\"bold-green-text\">pkg_name</span> appears in the output:"
     ;;
-  "fr")
-    question="Quelle sous-commande ansible-vault permet de changer le mot de passe d'un fichier déjà chiffré ?"
-    hint="ansible-vault dispose de plusieurs sous-commandes. L'une d'elles est spécifiquement conçue pour changer le mot de passe de chiffrement d'un fichier vault existant sans le déchiffrer au préalable."
-    instructions="[
-                  {
-                    \"instruction\": \"Utilisez <span class=\\\"bold-green-text\\\">ansible-vault rekey</span> pour changer le mot de passe d'un fichier chiffré existant.\",
-                    \"command\": \"ansible-vault rekey secrets.yaml\\n# Demande : mot de passe vault actuel\\n# Demande : nouveau mot de passe vault\\n# Demande : confirmer le nouveau mot de passe\"
-                  },
-                  {
-                    \"instruction\": \"Toutes les sous-commandes ansible-vault en un coup d'oeil.\",
-                    \"command\": \"ansible-vault create   secret.yaml  # nouveau fichier chiffré\\nansible-vault encrypt  secret.yaml  # chiffrer un fichier existant\\nansible-vault decrypt  secret.yaml  # déchiffrer en clair\\nansible-vault rekey    secret.yaml  # changer le mot de passe\\nansible-vault view     secret.yaml  # afficher sans déchiffrer\\nansible-vault edit     secret.yaml  # modifier en place\"
-                  }
-                ]"
-    answer_a="repass"
-    answer_b="rekey"  # Correct answer
-    answer_c="change-password"
-    answer_d="update"
+  fr)
+    question="Écrivez un playbook à \`$pb_path\` qui s'exécute sur le groupe \`webservers\` et utilise le module \`debug\` pour afficher la valeur de la variable \`pkg_name\`."
+    hint="Le module debug accepte soit \`msg:\` avec une expression Jinja2, soit \`var:\` avec un nom de variable nu. Assurez-vous que pkg_name est déjà défini dans votre inventaire comme variable de groupe."
+    inst1="Utilisez le module <span class=\"bold-green-text\">debug</span> avec <span class=\"bold-green-text\">var:</span> pour afficher la variable par son nom — aucune accolade Jinja2 n'est nécessaire avec cet argument :"
+    inst2="Exécutez le playbook et vérifiez que la valeur de <span class=\"bold-green-text\">pkg_name</span> apparaît dans la sortie :"
     ;;
   *)
-    question="Which ansible-vault sub-command is used to change the password on an already-encrypted file?"
-    hint="ansible-vault has several sub-commands. One of them is specifically designed for rotating the encryption password on an existing vault file without decrypting it first."
-    instructions="[
-                  {
-                    \"instruction\": \"Use <span class=\\\"bold-green-text\\\">ansible-vault rekey</span> to change the password on an existing encrypted file.\",
-                    \"command\": \"ansible-vault rekey secrets.yaml\\n# Prompts for: current vault password\\n# Prompts for: new vault password\\n# Prompts for: confirm new vault password\"
-                  },
-                  {
-                    \"instruction\": \"All ansible-vault sub-commands at a glance.\",
-                    \"command\": \"ansible-vault create   secret.yaml  # new encrypted file\\nansible-vault encrypt  secret.yaml  # encrypt existing file\\nansible-vault decrypt  secret.yaml  # decrypt to plaintext\\nansible-vault rekey    secret.yaml  # change the password\\nansible-vault view     secret.yaml  # view without decrypting\\nansible-vault edit     secret.yaml  # edit in place\"
-                  }
-                ]"
-    answer_a="repass"
-    answer_b="rekey"  # Correct answer
-    answer_c="change-password"
-    answer_d="update"
-    ;;
+    echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
 esac
 
-# Put answers in an array
-answers=("\"answer_a\":\"$answer_a\"" "\"answer_b\":\"$answer_b\"" "\"answer_c\":\"$answer_c\"" "\"answer_d\":\"$answer_d\"")
+# Handle the case user skipped adding pkg_name group variable (q67)
+if ! grep -q "pkg_name" /home/ansible_user/workspace/inventory 2>/dev/null; then
+  grep -q '\[webservers:vars\]' /home/ansible_user/workspace/inventory || printf '\n[webservers:vars]\n' >> /home/ansible_user/workspace/inventory
+  echo 'pkg_name=nginx' >> /home/ansible_user/workspace/inventory
+fi
 
-# Shuffle the answers to avoid predictable order
-shuffled_answers=$(printf "%s\n" "${answers[@]}" | shuf | paste -sd,)
+instructions=$(jq -n --arg inst1 "$inst1" --arg cmd1 "$cmd1" --arg inst2 "$inst2" --arg cmd2 "$cmd2" \
+  '[{"instruction": $inst1, "command": $cmd1}, {"instruction": $inst2, "command": $cmd2}]')
 
-# Build the display JSON
-display='{
-  "question": "'"$question"'",
-  "type": "multi",
-  "answers": {
-    '"$shuffled_answers"'
-  },
-  "hint": "'"$hint"'",
-  "instructions": '"$instructions"',
-  "solution": "'"$answer_b"'",
-  "plateforme_required": "server",
-  "os_required": "ubuntu"
-}'
-
-# Pretty print the JSON output
-echo "$display" | jq .
+jq -n --indent 4 \
+  --arg question "$question" \
+  --arg hint "$hint" \
+  --argjson instructions "$instructions" \
+  '{
+    "question": $question,
+    "plateforme_required": "container",
+    "os_required": "ubuntu",
+    "type": "button",
+    "hint": $hint,
+    "instructions": $instructions,
+    "text": "Check",
+    "tags": "ansible,variables,debug,playbook"
+  }'
