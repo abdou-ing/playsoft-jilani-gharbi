@@ -1,0 +1,169 @@
+WARNING: The "guacd" Docker link has been deprecated in favor of the "GUACD_HOSTNAME" and "GUACD_PORT" environment variables. Please migrate your configuration when possible, as Docker considers the linking feature to be legacy and support for Docker links may be removed in future releases. See: https://docs.docker.com/engine/network/links/
+WARNING: The "postgres" Docker link has been deprecated in favor of the "POSTGRESQL_HOSTNAME" and "POSTGRESQL_PORT" environment variables. Please migrate your configuration when possible, as Docker considers the linking feature to be legacy and support for Docker links may be removed in future releases. See: https://docs.docker.com/engine/network/links/
+WARNING: The "POSTGRES_" prefix for environment variables has been deprecated in favor of the "POSTGRESQL_" prefix. Please migrate your configuration when possible, as support for the older prefix may be removed in future releases.
+NOTE: Picked up JDK_JAVA_OPTIONS:  --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.transport=ALL-UNNAMED
+18-May-2026 10:27:04.278 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Server version name:   Apache Tomcat/9.0.117
+18-May-2026 10:27:04.307 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Server built:          Mar 30 2026 18:21:16 UTC
+18-May-2026 10:27:04.310 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Server version number: 9.0.117.0
+18-May-2026 10:27:04.311 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log OS Name:               Linux
+18-May-2026 10:27:04.314 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log OS Version:            6.8.0-90-generic
+18-May-2026 10:27:04.315 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Architecture:          amd64
+18-May-2026 10:27:04.316 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Java Home:             /opt/java/openjdk
+18-May-2026 10:27:04.316 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log JVM Version:           21.0.10+7-LTS
+18-May-2026 10:27:04.316 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log JVM Vendor:            Eclipse Adoptium
+18-May-2026 10:27:04.317 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log CATALINA_BASE:         /tmp/catalina-base.7PiPGmCRZk
+18-May-2026 10:27:04.317 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log CATALINA_HOME:         /usr/local/tomcat
+18-May-2026 10:27:04.328 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: --add-opens=java.base/java.lang=ALL-UNNAMED
+18-May-2026 10:27:04.330 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: --add-opens=java.base/java.lang.invoke=ALL-UNNAMED
+18-May-2026 10:27:04.330 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+18-May-2026 10:27:04.331 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: --add-opens=java.base/java.io=ALL-UNNAMED
+18-May-2026 10:27:04.332 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: --add-opens=java.base/java.util=ALL-UNNAMED
+18-May-2026 10:27:04.332 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: --add-opens=java.base/java.util.concurrent=ALL-UNNAMED
+18-May-2026 10:27:04.333 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: --add-opens=java.rmi/sun.rmi.transport=ALL-UNNAMED
+18-May-2026 10:27:04.334 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: -Djava.util.logging.config.file=/tmp/catalina-base.7PiPGmCRZk/conf/logging.properties
+18-May-2026 10:27:04.334 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager
+18-May-2026 10:27:04.335 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: -Djdk.tls.ephemeralDHKeySize=2048
+18-May-2026 10:27:04.335 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: -Djava.protocol.handler.pkgs=org.apache.catalina.webresources
+18-May-2026 10:27:04.335 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: -Dsun.io.useCanonCaches=false
+18-May-2026 10:27:04.336 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: -Dorg.apache.catalina.security.SecurityListener.UMASK=0027
+18-May-2026 10:27:04.336 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: -Dignore.endorsed.dirs=
+18-May-2026 10:27:04.337 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: -Dcatalina.base=/tmp/catalina-base.7PiPGmCRZk
+18-May-2026 10:27:04.338 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: -Dcatalina.home=/usr/local/tomcat
+18-May-2026 10:27:04.338 INFO [main] org.apache.catalina.startup.VersionLoggerListener.log Command line argument: -Djava.io.tmpdir=/tmp/catalina-base.7PiPGmCRZk/temp
+18-May-2026 10:27:04.349 INFO [main] org.apache.catalina.core.AprLifecycleListener.lifecycleEvent Loaded Apache Tomcat Native library [1.3.7] using APR version [1.7.2].
+18-May-2026 10:27:04.350 INFO [main] org.apache.catalina.core.AprLifecycleListener.lifecycleEvent APR capabilities: IPv6 [true], sendfile [true], accept filters [false], random [true], UDS [true].
+18-May-2026 10:27:04.350 INFO [main] org.apache.catalina.core.AprLifecycleListener.lifecycleEvent APR/OpenSSL configuration: useAprConnector [false], useOpenSSL [true]
+18-May-2026 10:27:04.357 INFO [main] org.apache.catalina.core.AprLifecycleListener.initializeSSL OpenSSL successfully initialized [OpenSSL 3.0.13 30 Jan 2024]
+18-May-2026 10:27:05.171 INFO [main] org.apache.coyote.AbstractProtocol.init Initializing ProtocolHandler ["http-nio-8080"]
+18-May-2026 10:27:05.248 INFO [main] org.apache.catalina.startup.Catalina.load Server initialization in [1615] milliseconds
+18-May-2026 10:27:05.320 INFO [main] org.apache.catalina.core.StandardService.startInternal Starting service [Catalina]
+18-May-2026 10:27:05.321 INFO [main] org.apache.catalina.core.StandardEngine.startInternal Starting Servlet engine: [Apache Tomcat/9.0.117]
+18-May-2026 10:27:05.363 INFO [main] org.apache.catalina.startup.HostConfig.deployWAR Deploying web application archive [/tmp/catalina-base.7PiPGmCRZk/webapps/guacamole.war]
+18-May-2026 10:27:12.195 INFO [main] org.apache.jasper.servlet.TldScanner.scanJars At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+10:27:13.539 [main] INFO org.apache.guacamole.environment.LocalEnvironment -- GUACAMOLE_HOME is "/tmp/guacamole-home.aN8mJRCQeS".
+10:27:13.883 [main] INFO org.apache.guacamole.GuacamoleServletContextListener -- Read configuration parameters from "/tmp/guacamole-home.aN8mJRCQeS/guacamole.properties".
+10:27:13.888 [main] INFO org.apache.guacamole.GuacamoleServletContextListener -- Additional configuration parameters may be read from environment variables.
+10:27:13.895 [main] INFO org.apache.guacamole.GuacamoleServletContextListener -- Additional configuration parameters may be read from files pointed to by "*_FILE" environment variables.
+10:27:14.035 [main] INFO org.apache.guacamole.rest.auth.HashTokenSessionMap -- [Redis session store] Connected to redis:6379
+10:27:14.497 [main] INFO org.apache.guacamole.log.LogModule -- Logging will be at the "info" level.
+10:27:15.676 [main] INFO  o.a.g.extension.ExtensionModule - Multiple extensions are installed and will be loaded in order of decreasing priority:
+10:27:15.677 [main] INFO  o.a.g.extension.ExtensionModule -  - [ban] "Brute-force Authentication Detection/Prevention" (/tmp/guacamole-home.aN8mJRCQeS/extensions/guacamole-auth-ban.jar)
+10:27:15.677 [main] INFO  o.a.g.extension.ExtensionModule -  - [postgresql] "PostgreSQL Authentication" (/tmp/guacamole-home.aN8mJRCQeS/extensions/guacamole-auth-jdbc-postgresql.jar)
+10:27:15.677 [main] INFO  o.a.g.extension.ExtensionModule - To change this order, set the "extension-priority" property or rename the extension files. The default priority of extensions is dictated by the sort order of their filenames.
+10:27:15.737 [main] INFO  o.a.g.a.b.BanningAuthenticationListener - Addresses will be automatically banned for 300 seconds after 5 failed authentication attempts. Up to 10485760 unique addresses will be tracked/banned at any given time.
+10:27:15.859 [main] INFO  o.a.g.extension.ExtensionModule - Extension "Brute-force Authentication Detection/Prevention" (ban) loaded.
+10:27:20.043 [main] INFO  o.a.g.extension.ExtensionModule - Extension "PostgreSQL Authentication" (postgresql) loaded.
+10:27:20.676 [main] INFO  o.a.g.t.w.WebSocketTunnelModule - Loading JSR-356 WebSocket support...
+10:27:21.306 [main] INFO  o.a.g.event.EventLoggingListener - The Apache Guacamole web application has started.
+10:27:22.850 [main] WARN  o.g.jersey.server.wadl.WadlFeature - JAXBContext implementation could not be found. WADL feature is disabled.
+18-May-2026 10:27:23.812 INFO [main] org.apache.catalina.startup.HostConfig.deployWAR Deployment of web application archive [/tmp/catalina-base.7PiPGmCRZk/webapps/guacamole.war] has finished in [18,450] ms
+18-May-2026 10:27:23.825 INFO [main] org.apache.coyote.AbstractProtocol.start Starting ProtocolHandler ["http-nio-8080"]
+18-May-2026 10:27:23.857 INFO [main] org.apache.catalina.startup.Catalina.start Server startup in [18607] milliseconds
+10:27:50.753 [http-nio-8080-exec-2] ERROR o.g.j.server.ServerRuntime$Responder - An exception has been thrown from an exception mapper class org.apache.guacamole.rest.RESTExceptionMapper.
+java.lang.NullPointerException: Cannot invoke "Object.hashCode()" because "key" is null
+	at java.base/java.util.concurrent.ConcurrentHashMap.replaceNode(ConcurrentHashMap.java:1111)
+	at java.base/java.util.concurrent.ConcurrentHashMap.remove(ConcurrentHashMap.java:1102)
+	at org.apache.guacamole.rest.auth.HashTokenSessionMap.remove(HashTokenSessionMap.java:245)
+	at org.apache.guacamole.rest.auth.AuthenticationService.destroyGuacamoleSession(AuthenticationService.java:491)
+	at org.apache.guacamole.rest.RESTExceptionMapper.toResponse(RESTExceptionMapper.java:77)
+	at org.glassfish.jersey.server.ServerRuntime$Responder.mapException(ServerRuntime.java:542)
+	at org.glassfish.jersey.server.ServerRuntime$Responder.process(ServerRuntime.java:412)
+	at org.glassfish.jersey.server.ServerRuntime$1.run(ServerRuntime.java:264)
+	at org.glassfish.jersey.internal.Errors$1.call(Errors.java:248)
+	at org.glassfish.jersey.internal.Errors$1.call(Errors.java:244)
+	at org.glassfish.jersey.internal.Errors.process(Errors.java:292)
+	at org.glassfish.jersey.internal.Errors.process(Errors.java:274)
+	at org.glassfish.jersey.internal.Errors.process(Errors.java:244)
+	at org.glassfish.jersey.process.internal.RequestScope.runInScope(RequestScope.java:265)
+	at org.glassfish.jersey.server.ServerRuntime.process(ServerRuntime.java:235)
+	at org.glassfish.jersey.server.ApplicationHandler.handle(ApplicationHandler.java:684)
+	at org.glassfish.jersey.servlet.WebComponent.serviceImpl(WebComponent.java:397)
+	at org.glassfish.jersey.servlet.WebComponent.service(WebComponent.java:349)
+	at org.glassfish.jersey.servlet.ServletContainer.service(ServletContainer.java:379)
+	at org.glassfish.jersey.servlet.ServletContainer.service(ServletContainer.java:312)
+	at org.glassfish.jersey.servlet.ServletContainer.service(ServletContainer.java:205)
+	at com.google.inject.servlet.ServletDefinition.doServiceImpl(ServletDefinition.java:290)
+	at com.google.inject.servlet.ServletDefinition.doService(ServletDefinition.java:280)
+	at com.google.inject.servlet.ServletDefinition.service(ServletDefinition.java:184)
+	at com.google.inject.servlet.ManagedServletPipeline.service(ManagedServletPipeline.java:89)
+	at com.google.inject.servlet.FilterChainInvocation.doFilter(FilterChainInvocation.java:85)
+	at com.google.inject.servlet.ManagedFilterPipeline.dispatch(ManagedFilterPipeline.java:121)
+	at com.google.inject.servlet.GuiceFilter.doFilter(GuiceFilter.java:133)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:166)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:142)
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:166)
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:88)
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:491)
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:127)
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:83)
+	at org.apache.catalina.valves.AbstractAccessLogValve.invoke(AbstractAccessLogValve.java:643)
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:72)
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:344)
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:398)
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63)
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:939)
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1854)
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:973)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:491)
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+10:27:50.757 [http-nio-8080-exec-2] ERROR o.g.j.server.ServerRuntime$Responder - An exception was not mapped due to exception mapper failure. The HTTP 500 response will be returned.
+org.apache.guacamole.net.auth.credentials.GuacamoleInvalidCredentialsException: Invalid login
+	at org.apache.guacamole.auth.jdbc.JDBCAuthenticationProviderService.authenticateUser(JDBCAuthenticationProviderService.java:88)
+	at org.apache.guacamole.auth.jdbc.InjectedAuthenticationProvider.authenticateUser(InjectedAuthenticationProvider.java:76)
+	at org.apache.guacamole.extension.AuthenticationProviderFacade.authenticateUser(AuthenticationProviderFacade.java:202)
+	at org.apache.guacamole.rest.auth.AuthenticationService.authenticateUser(AuthenticationService.java:132)
+	at org.apache.guacamole.rest.auth.AuthenticationService.getAuthenticatedUser(AuthenticationService.java:235)
+	at org.apache.guacamole.rest.auth.AuthenticationService.authenticate(AuthenticationService.java:391)
+	at org.apache.guacamole.rest.auth.TokenRESTService.createToken(TokenRESTService.java:174)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.glassfish.jersey.server.model.internal.ResourceMethodInvocationHandlerFactory.lambda$static$0(ResourceMethodInvocationHandlerFactory.java:52)
+	at org.glassfish.jersey.server.model.internal.AbstractJavaResourceMethodDispatcher$1.run(AbstractJavaResourceMethodDispatcher.java:146)
+	at org.glassfish.jersey.server.model.internal.AbstractJavaResourceMethodDispatcher.invoke(AbstractJavaResourceMethodDispatcher.java:189)
+	at org.glassfish.jersey.server.model.internal.JavaResourceMethodDispatcherProvider$TypeOutInvoker.doDispatch(JavaResourceMethodDispatcherProvider.java:219)
+	at org.glassfish.jersey.server.model.internal.AbstractJavaResourceMethodDispatcher.dispatch(AbstractJavaResourceMethodDispatcher.java:93)
+	at org.glassfish.jersey.server.model.ResourceMethodInvoker.invoke(ResourceMethodInvoker.java:478)
+	at org.glassfish.jersey.server.model.ResourceMethodInvoker.apply(ResourceMethodInvoker.java:400)
+	at org.glassfish.jersey.server.model.ResourceMethodInvoker.apply(ResourceMethodInvoker.java:81)
+	at org.glassfish.jersey.server.ServerRuntime$1.run(ServerRuntime.java:256)
+	at org.glassfish.jersey.internal.Errors$1.call(Errors.java:248)
+	at org.glassfish.jersey.internal.Errors$1.call(Errors.java:244)
+	at org.glassfish.jersey.internal.Errors.process(Errors.java:292)
+	at org.glassfish.jersey.internal.Errors.process(Errors.java:274)
+	at org.glassfish.jersey.internal.Errors.process(Errors.java:244)
+	at org.glassfish.jersey.process.internal.RequestScope.runInScope(RequestScope.java:265)
+	at org.glassfish.jersey.server.ServerRuntime.process(ServerRuntime.java:235)
+	at org.glassfish.jersey.server.ApplicationHandler.handle(ApplicationHandler.java:684)
+	at org.glassfish.jersey.servlet.WebComponent.serviceImpl(WebComponent.java:397)
+	at org.glassfish.jersey.servlet.WebComponent.service(WebComponent.java:349)
+	at org.glassfish.jersey.servlet.ServletContainer.service(ServletContainer.java:379)
+	at org.glassfish.jersey.servlet.ServletContainer.service(ServletContainer.java:312)
+	at org.glassfish.jersey.servlet.ServletContainer.service(ServletContainer.java:205)
+	at com.google.inject.servlet.ServletDefinition.doServiceImpl(ServletDefinition.java:290)
+	at com.google.inject.servlet.ServletDefinition.doService(ServletDefinition.java:280)
+	at com.google.inject.servlet.ServletDefinition.service(ServletDefinition.java:184)
+	at com.google.inject.servlet.ManagedServletPipeline.service(ManagedServletPipeline.java:89)
+	at com.google.inject.servlet.FilterChainInvocation.doFilter(FilterChainInvocation.java:85)
+	at com.google.inject.servlet.ManagedFilterPipeline.dispatch(ManagedFilterPipeline.java:121)
+	at com.google.inject.servlet.GuiceFilter.doFilter(GuiceFilter.java:133)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:166)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:142)
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:166)
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:88)
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:491)
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:127)
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:83)
+	at org.apache.catalina.valves.AbstractAccessLogValve.invoke(AbstractAccessLogValve.java:643)
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:72)
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:344)
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:398)
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63)
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:939)
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1854)
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:973)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:491)
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
