@@ -1,0 +1,37 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# RHCE Lab 1 — Ansible Environment Setup
+#
+# Each task uploads its bash check script to check_host and runs it there.
+# The scripts output {"result":"0"} for pass, {"result":"<msg>"} for fail.
+#
+# All lab1 scripts run on control-node1 — they check the managed nodes
+# internally via the candidate's own ansible.cfg and inventory.
+# ─────────────────────────────────────────────────────────────────────────────
+
+exam_tasks:
+
+  - id: lab1_q47
+    title: "SSH key pair generated (no passphrase, ≥2048 bits)"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab1/q47_check.sh"
+
+  - id: lab1_q48
+    title: "SSH key distributed to web1 and web2 (passwordless auth)"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab1/q48_check.sh"
+
+  - id: lab1_q49
+    title: "Inventory file: web1 in [webservers1], web2 in [webservers2]"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab1/q49_check.sh"
+
+  - id: lab1_q50
+    title: "ansible.cfg: remote_user, inventory path, become=true"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab1/q50_check.sh"
+
+  - id: lab1_q51
+    title: "ansible all -m ping returns SUCCESS on all hosts"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab1/q51_check.sh"

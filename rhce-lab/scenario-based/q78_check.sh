@@ -10,39 +10,51 @@ fi
 lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
+pb_path="/home/ansible_user/workspace/onboard_john.yml"
+inventory="/home/ansible_user/workspace/inventory"
+
 declare -A messages_en=(
-  ["no_user"]="User 'john' does not exist. Create it with: sudo useradd -m -s /bin/bash john"
-  ["wrong_shell"]="John's login shell is not /bin/bash. Fix it with: sudo usermod -s /bin/bash john"
-  ["wrong_home"]="John's home directory entry in /etc/passwd is not /home/john. Check with: getent passwd john"
-  ["no_home_dir"]="The home directory /home/john does not exist on disk. Re-create the user with: sudo userdel -r john && sudo useradd -m -s /bin/bash john"
+  ["no_file"]="Playbook not found at $pb_path. Create it first."
+  ["no_user_module"]="The playbook does not use the 'user' module. Use ansible.builtin.user with name: john."
+  ["no_become"]="The playbook is missing 'become: yes'. Managing users requires privilege escalation."
+  ["no_john"]="User 'john' does not exist on web1. Run the playbook: ansible-playbook -i $inventory $pb_path"
+  ["wrong_shell"]="john exists on web1 but his shell is not /bin/bash. Add shell: /bin/bash to your user task."
+  ["no_home"]="john exists on web1 but has no home directory. Add create_home: yes to your user task."
 )
 declare -A messages_fr=(
-  ["no_user"]="L'utilisateur 'john' n'existe pas. Créez-le avec : sudo useradd -m -s /bin/bash john"
-  ["wrong_shell"]="Le shell de connexion de john n'est pas /bin/bash. Corrigez avec : sudo usermod -s /bin/bash john"
-  ["wrong_home"]="Le répertoire home de john dans /etc/passwd n'est pas /home/john. Vérifiez avec : getent passwd john"
-  ["no_home_dir"]="Le répertoire /home/john n'existe pas sur le disque. Recréez l'utilisateur avec : sudo userdel -r john && sudo useradd -m -s /bin/bash john"
+  ["no_file"]="Playbook introuvable à $pb_path. Créez-le d'abord."
+  ["no_user_module"]="Le playbook n'utilise pas le module 'user'. Utilisez ansible.builtin.user avec name: john."
+  ["no_become"]="Le playbook n'a pas 'become: yes'. La gestion des utilisateurs nécessite une élévation de privilèges."
+  ["no_john"]="L'utilisateur 'john' n'existe pas sur web1. Exécutez le playbook : ansible-playbook -i $inventory $pb_path"
+  ["wrong_shell"]="john existe sur web1 mais son shell n'est pas /bin/bash. Ajoutez shell: /bin/bash à votre tâche user."
+  ["no_home"]="john existe sur web1 mais n'a pas de répertoire home. Ajoutez create_home: yes à votre tâche user."
 )
 
 get_message() { declare -n _m="messages_$lang"; echo "{\"result\": \"${_m[$1]}\"}"; }
 
-if ! id john &>/dev/null; then
-  echo "$(get_message no_user)"; exit 0
+if [ ! -f "$pb_path" ]; then
+  echo "$(get_message no_file)"; exit 0
 fi
 
-passwd_entry=$(getent passwd john)
-user_shell=$(echo "$passwd_entry" | cut -d: -f7)
-user_home=$(echo "$passwd_entry" | cut -d: -f6)
+if ! grep -q "user:" "$pb_path" && ! grep -q "ansible.builtin.user" "$pb_path"; then
+  echo "$(get_message no_user_module)"; exit 0
+fi
 
-if [ "$user_shell" != "/bin/bash" ]; then
+if ! grep -q "become" "$pb_path"; then
+  echo "$(get_message no_become)"; exit 0
+fi
+
+result=$(ansible web1 -i "$inventory" -m command -a "getent passwd john" --become 2>/dev/null)
+if ! echo "$result" | grep -q "rc=0"; then
+  echo "$(get_message no_john)"; exit 0
+fi
+
+if ! echo "$result" | grep -q "/bin/bash"; then
   echo "$(get_message wrong_shell)"; exit 0
 fi
 
-if [ "$user_home" != "/home/john" ]; then
-  echo "$(get_message wrong_home)"; exit 0
-fi
-
-if [ ! -d "/home/john" ]; then
-  echo "$(get_message no_home_dir)"; exit 0
+if ! echo "$result" | grep -q "/home/john"; then
+  echo "$(get_message no_home)"; exit 0
 fi
 
 echo '{"result": "0"}'

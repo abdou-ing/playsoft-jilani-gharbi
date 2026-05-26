@@ -1,0 +1,43 @@
+---
+# check_user_attrs.yml — Verify a user exists and has the expected attributes
+#
+# check_args:
+#   name: alice           — username to check
+#   hosts: all|hostname   — where to run
+#   uid: 2006             — expected uid (optional)
+#   shell: /bin/bash      — expected shell (optional)
+#   home: /home/alice     — expected home directory (optional)
+
+- name: "{{ exam_task.id }} | User attrs check: {{ exam_task.check_args.name }}"
+  when: >
+    exam_task.check_args.hosts == 'all' or
+    inventory_hostname in ([exam_task.check_args.hosts] | flatten)
+  block:
+    - name: "{{ exam_task.id }} | Check {{ exam_task.check_args.name }} exists with correct attributes"
+      ansible.builtin.shell: |
+        getent passwd {{ exam_task.check_args.name }} > /dev/null 2>&1 || exit 1
+        {% if exam_task.check_args.uid is defined %}
+        [ "$(id -u {{ exam_task.check_args.name }})" = "{{ exam_task.check_args.uid }}" ] || exit 1
+        {% endif %}
+        {% if exam_task.check_args.shell is defined %}
+        [ "$(getent passwd {{ exam_task.check_args.name }} | cut -d: -f7)" = "{{ exam_task.check_args.shell }}" ] || exit 1
+        {% endif %}
+        {% if exam_task.check_args.home is defined %}
+        [ "$(getent passwd {{ exam_task.check_args.name }} | cut -d: -f6)" = "{{ exam_task.check_args.home }}" ] || exit 1
+        {% endif %}
+        exit 0
+      register: _user_attrs
+      ignore_errors: true
+      changed_when: false
+
+    - name: "{{ exam_task.id }} | Record result"
+      set_fact:
+        exam_results: >-
+          {{
+            exam_results + [{
+              'id': exam_task.id,
+              'title': exam_task.title,
+              'host': inventory_hostname,
+              'passed': (_user_attrs.rc == 0)
+            }]
+          }}

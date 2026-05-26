@@ -1,0 +1,56 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# rhce_lab1_check.yml — Grade Lab 1 (Ansible Environment Setup)
+#
+# Usage:
+#   ansible-playbook -i <inventory> rhce_lab1_check.yml
+#
+# Checks q47–q51:
+#   q47  SSH key pair generated correctly
+#   q48  Public key distributed to target nodes
+#   q49  Inventory file with webservers1 / webservers2 groups
+#   q50  ansible.cfg with remote_user, inventory, become=true
+#   q51  ansible all -m ping returns SUCCESS
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Play 1: Run all lab1 checks on the exam nodes
+- name: "RHCE Lab 1 — Run checks on exam nodes"
+  hosts: exam_nodes
+  gather_facts: true
+  become: true
+  vars_files:
+    - vars/rhce_lab1_tasks.yml
+  roles:
+    - exam_checker
+
+# Play 2: Aggregate and print results
+- name: "RHCE Lab 1 — Print Results"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/rhce_lab1_tasks.yml
+  tasks:
+    - name: Aggregate results from all exam nodes
+      set_fact:
+        all_results: "{{ all_results | default([]) + (hostvars[item].exam_results | default([])) }}"
+      loop: "{{ groups['exam_nodes'] }}"
+
+    - name: Calculate score
+      set_fact:
+        passed_count: "{{ all_results | selectattr('passed', 'equalto', true) | list | length }}"
+        total_count: "{{ all_results | length }}"
+
+    - name: Print lab1 results
+      debug:
+        msg: |
+          ════════════════════════════════════════════════════════
+           RHCE LAB 1 RESULTS — Ansible Environment Setup
+          ════════════════════════════════════════════════════════
+          {% for result in all_results %}
+          {% if result.passed %}  ✅ PASS{% else %}  ❌ FAIL{% endif %}  [{{ result.host | upper }}]  {{ result.id }}: {{ result.title }}
+          {% endfor %}
+          ════════════════════════════════════════════════════════
+           Score: {{ passed_count }} / {{ total_count }}
+           Grade: {% if (passed_count | int / total_count | int * 100) >= 70 %}PASSED ✅{% else %}FAILED ❌{% endif %}
+
+          ════════════════════════════════════════════════════════

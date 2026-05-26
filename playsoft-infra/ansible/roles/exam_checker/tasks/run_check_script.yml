@@ -1,0 +1,45 @@
+---
+# run_check_script.yml — Upload a bash check script to the target host, run it,
+# and parse its {"result": "0"} JSON output into exam_results.
+#
+# exam_task fields:
+#   id          — unique identifier  (e.g. lab1_q47)
+#   title       — human-readable label
+#   check_host  — which inventory host to run on  (e.g. control-node1)
+#   check_script — local path to the .sh file    (e.g. {{ playbook_dir }}/../../rhce-lab/lab1/q47_check.sh)
+#   check_user  — user to run the script as       (default: ansible_user)
+
+- name: "{{ exam_task.id }} | Upload {{ exam_task.check_script | basename }}"
+  when: inventory_hostname == exam_task.check_host
+  ansible.builtin.copy:
+    src: "{{ exam_task.check_script }}"
+    dest: "/tmp/{{ exam_task.id }}_check.sh"
+    mode: "0755"
+
+- name: "{{ exam_task.id }} | Execute script as {{ exam_task.check_user | default('ansible_user') }}"
+  when: inventory_hostname == exam_task.check_host
+  ansible.builtin.shell: "bash /tmp/{{ exam_task.id }}_check.sh"
+  register: _script_result
+  ignore_errors: true
+  changed_when: false
+  become_user: "{{ exam_task.check_user | default('ansible_user') }}"
+
+- name: "{{ exam_task.id }} | Remove script from /tmp"
+  when: inventory_hostname == exam_task.check_host
+  ansible.builtin.file:
+    path: "/tmp/{{ exam_task.id }}_check.sh"
+    state: absent
+  ignore_errors: true
+
+- name: "{{ exam_task.id }} | Record result"
+  when: inventory_hostname == exam_task.check_host
+  set_fact:
+    exam_results: >-
+      {{
+        exam_results + [{
+          'id':     exam_task.id,
+          'title':  exam_task.title,
+          'host':   inventory_hostname,
+          'passed': ('"result": "0"' in (_script_result.stdout | default('')))
+        }]
+      }}

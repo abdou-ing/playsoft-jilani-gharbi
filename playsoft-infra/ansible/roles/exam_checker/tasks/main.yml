@@ -1,43 +1,77 @@
 ---
 # ─────────────────────────────────────────────────────────────────────────────
-# exam_checker/tasks/main.yml — Orchestrates all check types
+# exam_checker/tasks/main.yml
+#
+# Two dispatch modes:
+#   check_script defined  → upload + run the bash check script (lab1, lab2)
+#   check_type defined    → inline type-based handler  (setup tasks)
 # ─────────────────────────────────────────────────────────────────────────────
 
 - name: Initialize exam results list
   set_fact:
     exam_results: []
 
-- name: Run package checks
-  include_tasks: check_package.yml
-  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'package') | list }}"
+# ── Script-based checks (lab1 / lab2) ────────────────────────────────────────
+- name: Run script-based checks
+  include_tasks: run_check_script.yml
+  loop: "{{ exam_tasks | selectattr('check_script', 'defined') | list }}"
   loop_control:
     loop_var: exam_task
     label: "{{ exam_task.id }}"
 
-- name: Run user_exists checks
-  include_tasks: check_user_exists.yml
-  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'user_exists') | list }}"
-  loop_control:
-    loop_var: exam_task
-    label: "{{ exam_task.id }}"
-
-- name: Run file_contains checks
-  include_tasks: check_file_contains.yml
-  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'file_contains') | list }}"
-  loop_control:
-    loop_var: exam_task
-    label: "{{ exam_task.id }}"
-
+# ── Type-based checks (setup tasks) ──────────────────────────────────────────
 - name: Run ssh_auth checks
-  include_tasks: check_ssh_auth.yml
+  include_tasks: q48_check_ssh_auth.yml
   loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'ssh_auth') | list }}"
   loop_control:
     loop_var: exam_task
     label: "{{ exam_task.id }}"
 
+- name: Run ansible_cfg checks
+  include_tasks: q50_check_ansible_cfg.yml
+  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'ansible_cfg') | list }}"
+  loop_control:
+    loop_var: exam_task
+    label: "{{ exam_task.id }}"
+
 - name: Run ansible_ping checks
-  include_tasks: check_ansible_ping.yml
+  include_tasks: q51_check_ansible_ping.yml
   loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'ansible_ping') | list }}"
+  loop_control:
+    loop_var: exam_task
+    label: "{{ exam_task.id }}"
+
+- name: Run user_attrs checks
+  include_tasks: q53_check_user_attrs.yml
+  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'user_attrs') | list }}"
+  loop_control:
+    loop_var: exam_task
+    label: "{{ exam_task.id }}"
+
+- name: Run user_absent checks
+  include_tasks: q54_check_user_absent.yml
+  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'user_absent') | list }}"
+  loop_control:
+    loop_var: exam_task
+    label: "{{ exam_task.id }}"
+
+- name: Run service checks
+  include_tasks: q55_check_service.yml
+  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'service') | list }}"
+  loop_control:
+    loop_var: exam_task
+    label: "{{ exam_task.id }}"
+
+- name: Run file_entry checks
+  include_tasks: q56_check_file_entry.yml
+  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'file_entry') | list }}"
+  loop_control:
+    loop_var: exam_task
+    label: "{{ exam_task.id }}"
+
+- name: Run path checks
+  include_tasks: q57_check_path.yml
+  loop: "{{ exam_tasks | selectattr('check_type', 'equalto', 'path') | list }}"
   loop_control:
     loop_var: exam_task
     label: "{{ exam_task.id }}"

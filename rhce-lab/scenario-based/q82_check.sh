@@ -10,24 +10,33 @@ fi
 lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
+pb_path="/home/ansible_user/workspace/password_policy.yml"
+inventory="/home/ansible_user/workspace/inventory"
+
 declare -A messages_en=(
-  ["no_user"]="User 'john' does not exist. Create it first: sudo useradd -m -s /bin/bash john"
-  ["wrong_max"]="John's maximum password age is not set to 90 days. Run: sudo chage -M 90 john — then verify with: chage -l john"
-  ["wrong_warn"]="John's password warning period is not set to 7 days. Run: sudo chage -W 7 john — then verify with: chage -l john"
+  ["no_file"]="Playbook not found at $pb_path. Create it first."
+  ["no_chage"]="The playbook does not call chage. Use the command module: cmd: chage -M 90 -W 7 john"
+  ["wrong_max"]="John's maximum password age is not 90 days on web1. Run the playbook: ansible-playbook -i $inventory $pb_path"
+  ["wrong_warn"]="John's password warning period is not 7 days on web1. Ensure your chage command includes -W 7."
 )
 declare -A messages_fr=(
-  ["no_user"]="L'utilisateur 'john' n'existe pas. Créez-le d'abord : sudo useradd -m -s /bin/bash john"
-  ["wrong_max"]="L'âge maximum du mot de passe de john n'est pas défini à 90 jours. Exécutez : sudo chage -M 90 john — puis vérifiez avec : chage -l john"
-  ["wrong_warn"]="La période d'avertissement du mot de passe de john n'est pas définie à 7 jours. Exécutez : sudo chage -W 7 john — puis vérifiez avec : chage -l john"
+  ["no_file"]="Playbook introuvable à $pb_path. Créez-le d'abord."
+  ["no_chage"]="Le playbook n'appelle pas chage. Utilisez le module command : cmd: chage -M 90 -W 7 john"
+  ["wrong_max"]="L'âge maximum du mot de passe de john n'est pas 90 jours sur web1. Exécutez le playbook : ansible-playbook -i $inventory $pb_path"
+  ["wrong_warn"]="La période d'avertissement du mot de passe de john n'est pas 7 jours sur web1. Assurez-vous que votre commande chage inclut -W 7."
 )
 
 get_message() { declare -n _m="messages_$lang"; echo "{\"result\": \"${_m[$1]}\"}"; }
 
-if ! id john &>/dev/null; then
-  echo "$(get_message no_user)"; exit 0
+if [ ! -f "$pb_path" ]; then
+  echo "$(get_message no_file)"; exit 0
 fi
 
-chage_output=$(sudo chage -l john 2>/dev/null)
+if ! grep -q "chage" "$pb_path"; then
+  echo "$(get_message no_chage)"; exit 0
+fi
+
+chage_output=$(ansible web1 -i "$inventory" -m command -a "chage -l john" --become 2>/dev/null)
 
 max_days=$(echo "$chage_output" | grep -i "Maximum number" | grep -oE '[0-9]+$')
 warn_days=$(echo "$chage_output" | grep -i "warning" | grep -oE '[0-9]+$')

@@ -2,26 +2,59 @@
 if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
 lang="${1:-en}"
 
-# Clean state: remove john so the student starts fresh each run
-sudo userdel -r john 2>/dev/null || true
-sudo rm -rf /home/john 2>/dev/null || true
+inventory="/home/ansible_user/workspace/inventory"
 
-cmd1="sudo useradd -m -s /bin/bash john"
-cmd2="id john
-grep john /etc/passwd"
+# Skip-q60 guard
+if [ ! -f "$inventory" ]; then
+  mkdir -p /home/ansible_user/workspace
+  printf '[webservers]\nweb1\nweb2\n\n[dbservers]\nbd1\n\n[all:vars]\nansible_user=ansible_user\n' > "$inventory"
+fi
+for entry in "10.30.0.11 web1" "10.30.0.12 web2" "10.30.0.13 bd1"; do
+  grep -qF "${entry%% *}" /etc/hosts 2>/dev/null || printf '%s\n' "$entry" | sudo tee -a /etc/hosts >/dev/null 2>&1 || true
+done
+if [ ! -f "/home/ansible_user/.ssh/id_rsa" ]; then
+  ssh-keygen -t rsa -b 2048 -f /home/ansible_user/.ssh/id_rsa -N "" >/dev/null 2>&1
+  for _h in web1 web2 bd1; do
+    SSHPASS='Labby123' sshpass -e ssh-copy-id -o StrictHostKeyChecking=no \
+      -i /home/ansible_user/.ssh/id_rsa.pub ansible_user@"$_h" >/dev/null 2>&1 || true
+  done
+fi
+
+pb_path="/home/ansible_user/workspace/onboard_john.yml"
+
+# Clean state: remove john from webservers so the task starts fresh
+ansible webservers -i "$inventory" -m user -a "name=john state=absent remove=yes" \
+  --become -o >/dev/null 2>&1 || true
+rm -f "$pb_path"
+
+cmd1='```yaml
+---
+- name: onboard john to webservers
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: create user john
+      ansible.builtin.user:
+        name: john
+        create_home: yes
+        shell: /bin/bash
+        state: present
+```'
+cmd2="ansible-playbook -i $inventory $pb_path
+ansible webservers -i $inventory -m command -a 'id john' --become"
 
 case "$lang" in
   en)
-    question="A new junior developer, John, is starting today. Create a local user account named \`john\` with a home directory at \`/home/john\` and \`/bin/bash\` as his login shell."
-    hint="Use useradd with -m (create home directory) and -s /bin/bash (set login shell). Verify with: id john — you should see the uid, gid, and groups."
-    inst1="Create the user account for <span class=\"bold-green-text\">john</span> with a home directory and the bash shell:"
-    inst2="Verify the account was created correctly — check the uid, home directory, and shell:"
+    question="A new junior developer, John, is joining the team. Write a playbook at \`$pb_path\` that creates the user \`john\` with a home directory and \`/bin/bash\` as his login shell on all \`webservers\`. Run it."
+    hint="Use the ansible.builtin.user module with: name: john, create_home: yes, shell: /bin/bash, state: present. Target hosts: webservers. You need become: yes to manage users. Verify with: ansible webservers -m command -a 'id john' --become"
+    inst1="Write the playbook using the <span class=\"bold-green-text\">user</span> module — this is the idempotent way to create system users with Ansible:"
+    inst2="Run the playbook and verify john exists on all webservers:"
     ;;
   fr)
-    question="Un nouveau développeur junior, John, commence aujourd'hui. Créez un compte utilisateur local nommé \`john\` avec un répertoire home à \`/home/john\` et \`/bin/bash\` comme shell de connexion."
-    hint="Utilisez useradd avec -m (créer le répertoire home) et -s /bin/bash (définir le shell de connexion). Vérifiez avec : id john — vous devez voir l'uid, le gid et les groupes."
-    inst1="Créez le compte utilisateur pour <span class=\"bold-green-text\">john</span> avec un répertoire home et le shell bash :"
-    inst2="Vérifiez que le compte a été créé correctement — contrôlez l'uid, le répertoire home et le shell :"
+    question="L'histoire : 'Provisionnement de l'équipe dev via Ansible'. Un nouveau développeur junior, John, rejoint l'équipe. Écrivez un playbook à \`$pb_path\` qui crée l'utilisateur \`john\` avec un répertoire home et \`/bin/bash\` comme shell de connexion sur tous les \`webservers\`. Exécutez-le."
+    hint="Utilisez le module ansible.builtin.user avec : name: john, create_home: yes, shell: /bin/bash, state: present. Ciblez hosts: webservers. Vous avez besoin de become: yes pour gérer les utilisateurs. Vérifiez avec : ansible webservers -m command -a 'id john' --become"
+    inst1="Écrivez le playbook avec le module <span class=\"bold-green-text\">user</span> — c'est la méthode idempotente pour créer des utilisateurs système avec Ansible :"
+    inst2="Exécutez le playbook et vérifiez que john existe sur tous les webservers :"
     ;;
   *)
     echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
@@ -42,5 +75,5 @@ jq -n --indent 4 \
     "hint": $hint,
     "instructions": $instructions,
     "text": "Check",
-    "tags": "linux,useradd,user-management,onboarding"
+    "tags": "ansible,user,playbook,become,rhce"
   }'

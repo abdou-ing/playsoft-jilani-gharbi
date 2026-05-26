@@ -1,0 +1,71 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# rhce_exam_check.yml — Grade RHCE Practice Exam (White Test)
+#
+# Usage:
+#   ansible-playbook -i <inventory> rhce_exam_check.yml
+#
+# Prerequisites: Lab 1 fully completed (SSH keys, inventory, ansible.cfg).
+#
+# Checks q01–q18 (18 questions total):
+#   q01  inventory + ansible.cfg configuration
+#   q02  apt-pack.sh ad-hoc script with apt_repository module
+#   q03  packages.yml — php, mariadb-client, build-essential, apt upgrade
+#   q04  timesync.yml — chrony installed, configured, running
+#   q05  apache role + newrole.yml — apache2, template index.html
+#   q06  roles/requirements.yml — two Galaxy roles from GitHub
+#   q07  balance.yml — 3 plays with balancer/phpinfo roles
+#   q08  web.yml — webdev group, /webdev dir, symlink, index.html
+#   q09  vault.yml — encrypted with atenorth, dev_pass + mgr_pass
+#   q10  hosts.j2 + gen_hosts.yml — /etc/myhosts Jinja2 template
+#   q11  hwreport.yml + hwreport.j2 — /root/hwreport.txt on all hosts
+#   q12  issue.yml — /etc/issue conditional content per group
+#   q13  Rekey secret.yml from curabete to newvare
+#   q14  create_user.yml + user_list.yml — users with vault passwords
+#   q15  storage.yml — LVM block/rescue/always structure
+#   q16  cron.yml — natasha cron job */2 minutes
+#   q17  mycollections/requirements.yml — ansible.posix + community.general
+#   q18  selinux.yml — ansible.posix.selinux permissive/targeted
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Play 1: Run all exam checks on the exam nodes
+- name: "RHCE Exam — Run checks on exam nodes"
+  hosts: exam_nodes
+  gather_facts: true
+  become: true
+  vars_files:
+    - vars/rhce_exam_tasks.yml
+  roles:
+    - exam_checker
+
+# Play 2: Aggregate and print results
+- name: "RHCE Exam — Print Results"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/rhce_exam_tasks.yml
+  tasks:
+    - name: Aggregate results from all exam nodes
+      set_fact:
+        all_results: "{{ all_results | default([]) + (hostvars[item].exam_results | default([])) }}"
+      loop: "{{ groups['exam_nodes'] }}"
+
+    - name: Calculate score
+      set_fact:
+        passed_count: "{{ all_results | selectattr('passed', 'equalto', true) | list | length }}"
+        total_count: "{{ all_results | length }}"
+
+    - name: Print exam results
+      debug:
+        msg: |
+          ════════════════════════════════════════════════════════
+           RHCE PRACTICE EXAM RESULTS — White Test (18 Questions)
+          ════════════════════════════════════════════════════════
+          {% for result in all_results %}
+          {% if result.passed %}  ✅ PASS{% else %}  ❌ FAIL{% endif %}  [{{ result.host | upper }}]  {{ result.id }}: {{ result.title }}
+          {% endfor %}
+          ════════════════════════════════════════════════════════
+           Score: {{ passed_count }} / {{ total_count }}
+           Grade: {% if (passed_count | int / total_count | int * 100) >= 70 %}PASSED ✅{% else %}FAILED ❌{% endif %}
+
+          ════════════════════════════════════════════════════════

@@ -1,0 +1,35 @@
+---
+# check_user_absent.yml — Verify a user account has been removed
+#
+# check_args:
+#   name: charlie           — username that must NOT exist
+#   hosts: all|hostname     — where to run
+#   remove_home: true       — also verify home directory is gone (optional)
+
+- name: "{{ exam_task.id }} | User absent check: {{ exam_task.check_args.name }}"
+  when: >
+    exam_task.check_args.hosts == 'all' or
+    inventory_hostname in ([exam_task.check_args.hosts] | flatten)
+  block:
+    - name: "{{ exam_task.id }} | Verify {{ exam_task.check_args.name }} is absent"
+      ansible.builtin.shell: |
+        id {{ exam_task.check_args.name }} &>/dev/null && exit 1
+        {% if exam_task.check_args.remove_home | default(false) | bool %}
+        test -d /home/{{ exam_task.check_args.name }} && exit 1
+        {% endif %}
+        exit 0
+      register: _user_absent
+      ignore_errors: true
+      changed_when: false
+
+    - name: "{{ exam_task.id }} | Record result"
+      set_fact:
+        exam_results: >-
+          {{
+            exam_results + [{
+              'id': exam_task.id,
+              'title': exam_task.title,
+              'host': inventory_hostname,
+              'passed': (_user_absent.rc == 0)
+            }]
+          }}

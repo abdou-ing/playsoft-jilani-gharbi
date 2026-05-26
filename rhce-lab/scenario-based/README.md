@@ -1,10 +1,10 @@
 # Scenario-Based Questions — Question Bank
 
-This folder contains **7 questions** (q78–q84) built around a single narrative:
+This folder contains **15 questions** across **two narrative scenarios**.
+All questions follow the **RHCE pattern**: write an Ansible playbook on the control node that configures managed hosts (`web1`, `web2`, `bd1`). Each setup script resets its own state on the managed hosts, so skipping a question never blocks a later one.
 
-> **"Onboarding John to the Dev Team"** — A junior developer joins today. You work through user creation, group membership, sudo access, password policy, shared directory setup, and contract expiry — step by step, as a real sysadmin would.
-
-The questions are designed to be **independent**: each setup script resets its own state and injects any prerequisite it needs, so skipping a question never blocks a later one.
+**Control node:** Ubuntu 24.04 · runs as `ansible_user` · workspace at `/home/ansible_user/workspace/`
+**Managed hosts:** `web1` (10.30.0.11) · `web2` (10.30.0.12) · `bd1` (10.30.0.13) · password `Labby123`
 
 ---
 
@@ -13,102 +13,282 @@ The questions are designed to be **independent**: each setup script resets its o
 | Type | How it works | Graded by |
 |---|---|---|
 | `multi` | 4-choice MCQ, one correct answer, answers are shuffled | Student selects an answer |
-| `button` | Hands-on task — student performs it in the terminal, then clicks **Check** | `_check.sh` script verifies the result |
+| `button` | Hands-on task — student writes and runs an Ansible playbook, then clicks **Check** | `_check.sh` script verifies state on managed hosts via `ansible` ad-hoc commands |
 
 ---
 
-## Question Index
+# Scenario 1 — "Provisioning the Dev Team via Ansible" (q78–q84)
 
-### q78 — `button` — Create User
+The operations team needs to onboard a new developer named `john` on all webservers. You write Ansible playbooks on the control node to create the user, configure group membership, deploy sudo privileges, enforce password policy, create a shared directory, and set an account expiry — as a real RHCE candidate would.
 
-| # | Task | What the check verifies | Check file |
-|---|---|---|---|
-| q78 | Create user `john` with home directory `/home/john` and shell `/bin/bash` | User exists · shell is `/bin/bash` · home dir `/home/john` exists on disk | `q78_check.sh` |
-
-> Setup wipes john's account clean each run so re-attempts start fresh.
+**Ansible modules covered:** `ansible.builtin.user`, `ansible.builtin.group`, `ansible.builtin.copy`, `ansible.builtin.command` (chage), `ansible.builtin.file`
 
 ---
 
-### q79 — `button` — Group Membership
+## Q78 — `button` — Create User with Ansible
 
-| # | Task | What the check verifies | Check file |
-|---|---|---|---|
-| q79 | Add `john` to the `developers` secondary group | `developers` group exists · john is a member | `q79_check.sh` |
-
-> Setup creates `developers` group if missing and ensures john exists (skip-q78 guard). Removes john from `developers` each run for a clean task.
-
----
-
-### q80 — `button` — Sudo Access
-
-| # | Task | What the check verifies | Check file |
-|---|---|---|---|
-| q80 | Grant john sudo privileges by adding him to the `sudo` group (Ubuntu) | john is a member of the `sudo` group | `q80_check.sh` |
-
-> Setup ensures john exists (skip-q78 guard) and removes him from `sudo` each run for a clean task.
+| Field | Value |
+|---|---|
+| Task | Write a playbook at `/home/ansible_user/workspace/onboard_john.yml` that creates user `john` on all `webservers` with home directory and `/bin/bash` shell |
+| Ansible module | `ansible.builtin.user` |
+| Check verifies | User exists on web1 · shell is `/bin/bash` · `/home/john` exists |
+| Check file | `q78_check.sh` |
+| State reset | `john` is deleted from webservers (`state: absent, remove: yes`) at setup |
+| Independent | Yes — no prerequisites |
 
 ---
 
-### q81 — `multi` — Password Aging Audit
+## Q79 — `button` — Group Membership via Ansible
 
-| # | Topic | Candidate command |
-|---|---|---|
-| q81 | Read John's current maximum password age before any policy is applied | `chage -l john` |
-
-> Setup ensures john exists (skip-q78 guard) and resets chage to Ubuntu defaults (`99999`) so the MCQ always reflects the pre-policy state, even if q82 was attempted first.
-
----
-
-### q82 — `button` — Password Policy
-
-| # | Task | What the check verifies | Check file |
-|---|---|---|---|
-| q82 | Set John's password to expire every `90` days with a `7`-day warning | `chage -l john` → Max: 90 · Warn: 7 | `q82_check.sh` |
-
-> Setup ensures john exists (skip-q78 guard) and resets chage to defaults each run.
+| Field | Value |
+|---|---|
+| Task | Write a playbook at `/home/ansible_user/workspace/dev_group.yml` that creates the `developers` group and adds `john` to it (as secondary group) on all `webservers` |
+| Ansible modules | `ansible.builtin.group` + `ansible.builtin.user` with `append: yes` |
+| Check verifies | `developers` group exists on web1 · john is a member (via `id john`) |
+| Check file | `q79_check.sh` |
+| State reset | `developers` group removed + john's group membership cleared at setup |
+| Skip guard | Creates john if q78 was skipped |
 
 ---
 
-### q83 — `button` — Setgid Directory
+## Q80 — `button` — Sudo Access via Ansible copy
 
-| # | Task | What the check verifies | Check file |
-|---|---|---|---|
-| q83 | Create `/srv/devproject` owned by `developers` with the setgid bit set | Directory exists · group owner is `developers` · setgid bit is set | `q83_check.sh` |
-
-> Fully independent — does not depend on the john user. Setup creates the `developers` group if missing and removes `/srv/devproject` each run for a clean task.
-
----
-
-### q84 — `button` — Account Expiry
-
-| # | Task | What the check verifies | Check file |
-|---|---|---|---|
-| q84 | Set John's account to expire on `2026-12-31` | `chage -l john` → Account expires: Dec 31, 2026 | `q84_check.sh` |
-
-> Setup ensures john exists (skip-q78 guard) and resets account expiry to "never" each run.
+| Field | Value |
+|---|---|
+| Task | Write a playbook at `/home/ansible_user/workspace/sudo_access.yml` that deploys `/etc/sudoers.d/john` (content: `john ALL=(ALL) NOPASSWD:ALL`, mode `0440`) on all `webservers` using the `copy` module with sudoers validation |
+| Ansible module | `ansible.builtin.copy` with `validate: /usr/sbin/visudo -cf %s` |
+| Check verifies | `/etc/sudoers.d/john` exists on web1 · mode is `0440` · content grants NOPASSWD:ALL |
+| Check file | `q80_check.sh` |
+| State reset | `/etc/sudoers.d/john` deleted from webservers at setup |
+| Skip guard | Creates john if q78 was skipped |
 
 ---
 
-## Dependency map
+## Q81 — `multi` — Which module manages user accounts?
+
+| Field | Value |
+|---|---|
+| Question | Which Ansible module manages local user accounts (shell, home, groups, password aging) on Linux? |
+| Correct answer | `ansible.builtin.user` |
+| Wrong answers | `ansible.builtin.useradd`, `ansible.builtin.command`, `ansible.builtin.account` |
+| Candidate command | `ansible-doc ansible.builtin.user \| grep -A5 'password_expire'` |
+| Independent | Yes — MCQ, no state changes |
+
+---
+
+## Q82 — `button` — Password Policy via Ansible command
+
+| Field | Value |
+|---|---|
+| Task | Write a playbook at `/home/ansible_user/workspace/password_policy.yml` that sets john's password to expire every `90` days with a `7`-day warning on all `webservers` using `chage` via the `command` module |
+| Ansible module | `ansible.builtin.command` with `cmd: chage -M 90 -W 7 john` and `changed_when: true` |
+| Check verifies | `chage -l john` on web1 shows max=90 days · warning=7 days |
+| Check file | `q82_check.sh` |
+| State reset | chage reset to defaults (`-M 99999 -W 7`) on webservers at setup |
+| Skip guard | Creates john if q78 was skipped |
+
+---
+
+## Q83 — `button` — Setgid Shared Directory via Ansible file
+
+| Field | Value |
+|---|---|
+| Task | Write a playbook at `/home/ansible_user/workspace/shared_dir.yml` that creates `/srv/devproject` on all `webservers` owned by the `developers` group with mode `02775` (setgid) |
+| Ansible modules | `ansible.builtin.group` (create developers) + `ansible.builtin.file` with `mode: "02775"` |
+| Check verifies | `/srv/devproject` exists on web1 · group is `developers` · setgid bit is set |
+| Check file | `q83_check.sh` |
+| State reset | `/srv/devproject` deleted from webservers at setup |
+| Independent | Yes — no john dependency |
+
+---
+
+## Q84 — `button` — Account Expiry via Ansible command
+
+| Field | Value |
+|---|---|
+| Task | Write a playbook at `/home/ansible_user/workspace/account_expiry.yml` that sets john's account to expire on `2026-12-31` on all `webservers` using `chage -E` via the `command` module |
+| Ansible module | `ansible.builtin.command` with `cmd: chage -E 2026-12-31 john` and `changed_when: true` |
+| Check verifies | `chage -l john` on web1 shows account expires in 2026 |
+| Check file | `q84_check.sh` |
+| State reset | Account expiry reset to "never" (`-E -1`) on webservers at setup |
+| Skip guard | Creates john if q78 was skipped |
+
+---
+
+## Scenario 1 — Dependency Map
 
 ```
-q78  — fully independent (clean state: john deleted each run)
-q79  — skip-q78 guard: creates john if q78 was skipped
-q80  — skip-q78 guard: creates john if q78 was skipped
-q81  — skip-q78 guard: creates john if q78 was skipped; resets chage if q82 was done first
-q82  — skip-q78 guard: creates john if q78 was skipped
-q83  — fully independent (does not depend on john)
-q84  — skip-q78 guard: creates john if q78 was skipped
+q78  ── fully independent (john deleted from webservers each run)
+q79  ── skip-q78 guard: creates john on webservers if missing
+q80  ── skip-q78 guard: creates john on webservers if missing
+q81  ── MCQ, fully independent
+q82  ── skip-q78 guard: creates john on webservers if missing
+q83  ── fully independent (no john dependency)
+q84  ── skip-q78 guard: creates john on webservers if missing
 ```
 
-Every setup script handles its own prerequisites — no question is ever blocked by a skipped predecessor.
+## Scenario 1 — Summary
+
+| # | Type | Topic | Playbook path |
+|---|---|---|---|
+| q78 | `button` | Create user john via Ansible | `onboard_john.yml` |
+| q79 | `button` | Add john to developers group | `dev_group.yml` |
+| q80 | `button` | Deploy sudoers file with copy + validate | `sudo_access.yml` |
+| q81 | `multi` | Which module manages user accounts? | — |
+| q82 | `button` | Set password expiry with chage via command | `password_policy.yml` |
+| q83 | `button` | Create setgid shared directory | `shared_dir.yml` |
+| q84 | `button` | Set account expiry with chage -E | `account_expiry.yml` |
 
 ---
 
-## Summary
+---
 
-| Category | Questions | Count |
-|---|---|---|
-| MCQ (`multi`) | q81 | 1 |
-| Hands-on (`button`) | q78, q79, q80, q82, q83, q84 | 6 |
-| **Total** | q78–q84 | **7** |
+# Scenario 2 — "Hardening the Web Servers via Ansible" (q85–q91)
+
+The security team requires a series of hardening tasks on all webservers. You write Ansible playbooks to configure SSH, deploy banners, manage host resolution, tune kernel parameters, and apply firewall rules — targeting the managed hosts from the control node.
+
+**Ansible modules covered:** `ansible.builtin.lineinfile`, `ansible.builtin.service`, `ansible.builtin.copy`, `ansible.builtin.command` (sysctl), `ansible.builtin.iptables`
+
+---
+
+## Q85 — `button` — SSH Hardening via Ansible lineinfile
+
+| Field | Value |
+|---|---|
+| Task | Write a playbook at `/home/ansible_user/workspace/ssh_hardening.yml` that sets `PermitRootLogin no`, `PasswordAuthentication no`, `ClientAliveInterval 300` in `/etc/ssh/sshd_config` and restarts SSH on all `webservers` |
+| Ansible modules | `ansible.builtin.lineinfile` (×3) + `ansible.builtin.service` |
+| Check verifies | `sshd -T` on web1 shows all three directives correctly set |
+| Check file | `q85_check.sh` |
+| State reset | SSH restored to permissive defaults + service restarted at setup |
+| Independent | Yes |
+
+---
+
+## Q86 — `button` — SSH Login Banner via Ansible
+
+| Field | Value |
+|---|---|
+| Task | Write a playbook at `/home/ansible_user/workspace/ssh_banner.yml` that copies a local banner file to `/etc/ssh/banner`, sets `Banner /etc/ssh/banner` in `sshd_config`, and restarts SSH on all `webservers` |
+| Ansible modules | `ansible.builtin.copy` + `ansible.builtin.lineinfile` + `ansible.builtin.service` |
+| Banner source | `/home/ansible_user/workspace/motd_banner.txt` (created by setup script) |
+| Check verifies | `/etc/ssh/banner` exists on web1 · `sshd -T` shows `banner /etc/ssh/banner` |
+| Check file | `q86_check.sh` |
+| State reset | `/etc/ssh/banner` deleted + Banner directive removed + service restarted at setup |
+| Independent | Yes |
+
+---
+
+## Q87 — `button` — /etc/hosts Entries via Ansible lineinfile
+
+| Field | Value |
+|---|---|
+| Task | Write a playbook at `/home/ansible_user/workspace/hosts_entries.yml` that adds `10.30.0.11 web1`, `10.30.0.12 web2`, `10.30.0.13 bd1` to `/etc/hosts` on `all` managed hosts using `lineinfile` |
+| Ansible module | `ansible.builtin.lineinfile` with `state: present` (one task per entry) |
+| Check verifies | All three entries exist in `/etc/hosts` on web1 |
+| Check file | `q87_check.sh` |
+| State reset | All three entries removed from `/etc/hosts` on managed hosts at setup |
+| Independent | Yes |
+
+---
+
+## Q88 — `multi` — Which module manages services?
+
+| Field | Value |
+|---|---|
+| Question | Which Ansible module manages service state (started/stopped/restarted) and boot enablement across Linux init systems without needing to know if it's systemd or SysV? |
+| Correct answer | `ansible.builtin.service` |
+| Wrong answers | `ansible.builtin.systemd`, `ansible.builtin.command`, `ansible.builtin.daemon` |
+| Candidate command | `ansible-doc ansible.builtin.service \| grep -A5 'state:'` |
+| Independent | Yes — MCQ, no state changes |
+
+---
+
+## Q89 — `button` — NTP Configuration via Ansible
+
+| Field | Value |
+|---|---|
+| Task | Write a playbook at `/home/ansible_user/workspace/ntp_config.yml` that sets `NTP=pool.ntp.org` in `/etc/systemd/timesyncd.conf` and restarts + enables `systemd-timesyncd` on all `webservers` |
+| Ansible modules | `ansible.builtin.lineinfile` + `ansible.builtin.service` |
+| Check verifies | `grep '^NTP=' /etc/systemd/timesyncd.conf` on web1 returns `pool.ntp.org` |
+| Check file | `q89_check.sh` |
+| State reset | NTP= line removed + service restarted at setup |
+| Independent | Yes |
+
+---
+
+## Q90 — `button` — IP Forwarding via Ansible
+
+| Field | Value |
+|---|---|
+| Task | Write a playbook at `/home/ansible_user/workspace/ip_forwarding.yml` that creates `/etc/sysctl.d/99-forwarding.conf` with `net.ipv4.ip_forward = 1` using `lineinfile` (with `create: yes`) and applies it with `sysctl -p` on all `webservers` |
+| Ansible modules | `ansible.builtin.lineinfile` (create: yes) + `ansible.builtin.command` (sysctl -p) |
+| Check verifies | File exists on web1 · `sysctl net.ipv4.ip_forward` returns `1` |
+| Check file | `q90_check.sh` |
+| State reset | Config file deleted + `ip_forward` set to `0` on webservers at setup |
+| Independent | Yes |
+
+---
+
+## Q91 — `button` — Firewall Rules via Ansible iptables
+
+| Field | Value |
+|---|---|
+| Task | Write a playbook at `/home/ansible_user/workspace/firewall_rules.yml` that applies iptables rules on all `webservers`: accept established/related, accept TCP 22 and TCP 80, reject everything else in INPUT |
+| Ansible module | `ansible.builtin.iptables` (one task per rule, REJECT last) |
+| Check verifies | `iptables -L INPUT -n` on web1 shows ACCEPT for port 22, ACCEPT for port 80, and a REJECT rule |
+| Check file | `q91_check.sh` |
+| State reset | INPUT chain flushed (`iptables -F INPUT`) on webservers at setup |
+| Independent | Yes |
+
+---
+
+## Scenario 2 — Dependency Map
+
+```
+q85  ── fully independent (SSH defaults restored each run)
+q86  ── fully independent (banner removed each run)
+q87  ── fully independent (/etc/hosts entries removed each run)
+q88  ── MCQ, fully independent
+q89  ── fully independent (NTP line removed each run)
+q90  ── fully independent (config deleted + kernel reset each run)
+q91  ── fully independent (INPUT chain flushed each run)
+```
+
+All 7 hardening questions are self-contained — no question depends on another.
+
+## Scenario 2 — Summary
+
+| # | Type | Topic | Playbook path |
+|---|---|---|---|
+| q85 | `button` | SSH hardening (3 directives + service restart) | `ssh_hardening.yml` |
+| q86 | `button` | Deploy SSH login banner | `ssh_banner.yml` |
+| q87 | `button` | Add /etc/hosts entries on all hosts | `hosts_entries.yml` |
+| q88 | `multi` | Which module manages services? | — |
+| q89 | `button` | Configure NTP with timesyncd | `ntp_config.yml` |
+| q90 | `button` | Enable IP forwarding via sysctl | `ip_forwarding.yml` |
+| q91 | `button` | Apply iptables firewall rules | `firewall_rules.yml` |
+
+---
+
+---
+
+# Full Question Index
+
+| # | Scenario | Type | Topic |
+|---|---|---|---|
+| q78 | Provisioning the Dev Team | `button` | Create user john on webservers |
+| q79 | Provisioning the Dev Team | `button` | Add john to developers group |
+| q80 | Provisioning the Dev Team | `button` | Deploy sudoers file (copy + validate) |
+| q81 | Provisioning the Dev Team | `multi` | Which module manages user accounts? |
+| q82 | Provisioning the Dev Team | `button` | Set password expiry with chage via command |
+| q83 | Provisioning the Dev Team | `button` | Create setgid shared directory |
+| q84 | Provisioning the Dev Team | `button` | Set account expiry date |
+| q85 | Hardening the Web Servers | `button` | SSH hardening with lineinfile |
+| q86 | Hardening the Web Servers | `button` | SSH login banner (copy + lineinfile) |
+| q87 | Hardening the Web Servers | `button` | /etc/hosts entries on all managed hosts |
+| q88 | Hardening the Web Servers | `multi` | Which module manages services? |
+| q89 | Hardening the Web Servers | `button` | NTP configuration (timesyncd) |
+| q90 | Hardening the Web Servers | `button` | IP forwarding via sysctl |
+| q91 | Hardening the Web Servers | `button` | iptables firewall rules |
+
+**Total: 14 questions · 2 multi · 12 button · 2 scenarios**

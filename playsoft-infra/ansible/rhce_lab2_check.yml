@@ -1,0 +1,59 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# rhce_lab2_check.yml — Grade Lab 2 (Ansible Playbooks)
+#
+# Usage:
+#   ansible-playbook -i <inventory> rhce_lab2_check.yml
+#
+# Prerequisites: Lab 1 must be fully completed (SSH keys, inventory, ansible.cfg).
+#
+# Checks q53–q58:
+#   q53  users.yml — alice created (/bin/bash), bob uid=2006 (/bin/sh)
+#   q54  remove_user.yml — charlie absent with home directory removed
+#   q55  webserver.yml — httpd installed, active, enabled on webservers1
+#   q56  add_hosts.yml — 10.0.0.1 myserver in /etc/hosts on all
+#   q57  copy_file.yml — /etc/myapp/config.json exists on all
+#   q58  create_backup.yml — /backup dir with 755 root:root on all
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Play 1: Run all lab2 checks on the exam nodes
+- name: "RHCE Lab 2 — Run checks on exam nodes"
+  hosts: exam_nodes
+  gather_facts: true
+  become: true
+  vars_files:
+    - vars/rhce_lab2_tasks.yml
+  roles:
+    - exam_checker
+
+# Play 2: Aggregate and print results
+- name: "RHCE Lab 2 — Print Results"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/rhce_lab2_tasks.yml
+  tasks:
+    - name: Aggregate results from all exam nodes
+      set_fact:
+        all_results: "{{ all_results | default([]) + (hostvars[item].exam_results | default([])) }}"
+      loop: "{{ groups['exam_nodes'] }}"
+
+    - name: Calculate score
+      set_fact:
+        passed_count: "{{ all_results | selectattr('passed', 'equalto', true) | list | length }}"
+        total_count: "{{ all_results | length }}"
+
+    - name: Print lab2 results
+      debug:
+        msg: |
+          ════════════════════════════════════════════════════════
+           RHCE LAB 2 RESULTS — Ansible Playbooks
+          ════════════════════════════════════════════════════════
+          {% for result in all_results %}
+          {% if result.passed %}  ✅ PASS{% else %}  ❌ FAIL{% endif %}  [{{ result.host | upper }}]  {{ result.id }}: {{ result.title }}
+          {% endfor %}
+          ════════════════════════════════════════════════════════
+           Score: {{ passed_count }} / {{ total_count }}
+           Grade: {% if (passed_count | int / total_count | int * 100) >= 70 %}PASSED ✅{% else %}FAILED ❌{% endif %}
+
+          ════════════════════════════════════════════════════════

@@ -2,32 +2,64 @@
 if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
 lang="${1:-en}"
 
-# Ensure developers group exists
-if ! getent group developers &>/dev/null; then
-  sudo groupadd developers 2>/dev/null || true
+inventory="/home/ansible_user/workspace/inventory"
+pb_path="/home/ansible_user/workspace/shared_dir.yml"
+
+# Skip-q60 guard
+if [ ! -f "$inventory" ]; then
+  mkdir -p /home/ansible_user/workspace
+  printf '[webservers]\nweb1\nweb2\n\n[dbservers]\nbd1\n\n[all:vars]\nansible_user=ansible_user\n' > "$inventory"
+fi
+for entry in "10.30.0.11 web1" "10.30.0.12 web2" "10.30.0.13 bd1"; do
+  grep -qF "${entry%% *}" /etc/hosts 2>/dev/null || printf '%s\n' "$entry" | sudo tee -a /etc/hosts >/dev/null 2>&1 || true
+done
+if [ ! -f "/home/ansible_user/.ssh/id_rsa" ]; then
+  ssh-keygen -t rsa -b 2048 -f /home/ansible_user/.ssh/id_rsa -N "" >/dev/null 2>&1
+  for _h in web1 web2 bd1; do
+    SSHPASS='Labby123' sshpass -e ssh-copy-id -o StrictHostKeyChecking=no \
+      -i /home/ansible_user/.ssh/id_rsa.pub ansible_user@"$_h" >/dev/null 2>&1 || true
+  done
 fi
 
-# Clean state: remove /srv/devproject so the task starts fresh each run
-sudo rm -rf /srv/devproject 2>/dev/null || true
+# Clean state: remove /srv/devproject and developers group from webservers
+ansible webservers -i "$inventory" -m file \
+  -a "path=/srv/devproject state=absent" \
+  --become -o >/dev/null 2>&1 || true
+rm -f "$pb_path"
 
-cmd1="sudo mkdir -p /srv/devproject
-sudo chown :developers /srv/devproject
-sudo chmod g+s /srv/devproject"
-cmd2="ls -ld /srv/devproject
-stat -c '%G %a' /srv/devproject"
+cmd1='```yaml
+---
+- name: create shared project directory on webservers
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: ensure developers group exists
+      ansible.builtin.group:
+        name: developers
+        state: present
+
+    - name: create /srv/devproject with setgid
+      ansible.builtin.file:
+        path: /srv/devproject
+        state: directory
+        group: developers
+        mode: "02775"
+```'
+cmd2="ansible-playbook -i $inventory $pb_path
+ansible webservers -i $inventory -m command -a 'stat -c \"%G %a\" /srv/devproject' --become"
 
 case "$lang" in
   en)
-    question="The team is launching a shared project. Create the directory \`/srv/devproject\` owned by the \`developers\` group, and set the setgid bit so that every file created inside it automatically belongs to the \`developers\` group — letting John and his teammates collaborate without permission conflicts."
-    hint="Three steps: sudo mkdir -p /srv/devproject → sudo chown :developers /srv/devproject → sudo chmod g+s /srv/devproject. The setgid bit appears as 's' in the group execute position in ls -ld output."
-    inst1="Create the directory, assign group ownership to <span class=\"bold-green-text\">developers</span>, and set the <span class=\"bold-green-text\">setgid</span> bit in one sequence:"
-    inst2="Verify the directory has the correct group owner and the <span class=\"bold-green-text\">setgid</span> bit set (look for <span class=\"bold-green-text\">'s'</span> in the group execute position and a <span class=\"bold-green-text\">'2'</span> prefix in the octal mode):"
+    question="The team needs a shared directory for collaboration. Write a playbook at \`$pb_path\` that creates \`/srv/devproject\` on all \`webservers\` owned by the \`developers\` group with mode \`02775\` (setgid + group-writable). The setgid bit ensures new files inherit the group. Run it."
+    hint="Use ansible.builtin.file with: path: /srv/devproject, state: directory, group: developers, mode: '02775'. The leading '2' sets the setgid bit. First ensure the developers group exists with ansible.builtin.group. Verify: ansible webservers -m command -a 'stat -c \"%G %a\" /srv/devproject' --become"
+    inst1="Write the playbook — create the group first, then the directory with mode <span class=\"bold-green-text\">02775</span> (setgid):"
+    inst2="Run the playbook and verify the directory permissions on all webservers:"
     ;;
   fr)
-    question="L'équipe lance un projet partagé. Créez le répertoire \`/srv/devproject\` appartenant au groupe \`developers\`, et appliquez le bit setgid afin que chaque fichier créé à l'intérieur appartienne automatiquement au groupe \`developers\` — permettant à John et ses coéquipiers de collaborer sans conflits de permissions."
-    hint="Trois étapes : sudo mkdir -p /srv/devproject → sudo chown :developers /srv/devproject → sudo chmod g+s /srv/devproject. Le bit setgid apparaît comme 's' à la position d'exécution du groupe dans la sortie de ls -ld."
-    inst1="Créez le répertoire, assignez la propriété de groupe à <span class=\"bold-green-text\">developers</span>, et définissez le bit <span class=\"bold-green-text\">setgid</span> en une séquence :"
-    inst2="Vérifiez que le répertoire a le bon propriétaire de groupe et que le bit <span class=\"bold-green-text\">setgid</span> est défini (cherchez <span class=\"bold-green-text\">'s'</span> à la position d'exécution du groupe et un préfixe <span class=\"bold-green-text\">'2'</span> dans le mode octal) :"
+    question="L'équipe a besoin d'un répertoire partagé pour la collaboration. Écrivez un playbook à \`$pb_path\` qui crée \`/srv/devproject\` sur tous les \`webservers\` appartenant au groupe \`developers\` avec le mode \`02775\` (setgid + écriture groupe). Le bit setgid garantit que les nouveaux fichiers héritent du groupe. Exécutez-le."
+    hint="Utilisez ansible.builtin.file avec : path: /srv/devproject, state: directory, group: developers, mode: '02775'. Le '2' initial définit le bit setgid. Assurez d'abord que le groupe developers existe avec ansible.builtin.group. Vérifiez : ansible webservers -m command -a 'stat -c \"%G %a\" /srv/devproject' --become"
+    inst1="Écrivez le playbook — créez d'abord le groupe, puis le répertoire avec le mode <span class=\"bold-green-text\">02775</span> (setgid) :"
+    inst2="Exécutez le playbook et vérifiez les permissions du répertoire sur tous les webservers :"
     ;;
   *)
     echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
@@ -48,5 +80,5 @@ jq -n --indent 4 \
     "hint": $hint,
     "instructions": $instructions,
     "text": "Check",
-    "tags": "linux,chmod,setgid,mkdir,permissions,onboarding"
+    "tags": "ansible,file,setgid,permissions,group,rhce"
   }'

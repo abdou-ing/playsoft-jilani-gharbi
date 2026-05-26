@@ -1,0 +1,44 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# RHCE Lab 2 — Ansible Playbooks
+#
+# Each task uploads its bash check script to check_host and runs it there.
+# The scripts output {"result":"0"} for pass, {"result":"<msg>"} for fail.
+#
+# All lab2 scripts run on control-node1 — they use the candidate's ansible
+# to reach the managed nodes (web1 / web2) for state verification.
+#
+# Prerequisites: Lab 1 fully completed (SSH keys, inventory, ansible.cfg).
+# ─────────────────────────────────────────────────────────────────────────────
+
+exam_tasks:
+
+  - id: lab2_q53
+    title: "users.yml: alice exists (/bin/bash), bob has uid=2006 (/bin/sh)"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab2/q53_check.sh"
+
+  - id: lab2_q54
+    title: "remove_user.yml: charlie absent with home directory removed"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab2/q54_check.sh"
+
+  - id: lab2_q55
+    title: "webserver.yml: apache2/httpd installed, active and enabled"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab2/q55_check.sh"
+
+  - id: lab2_q56
+    title: "add_hosts.yml: '10.0.0.1 myserver' in /etc/hosts on all hosts"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab2/q56_check.sh"
+
+  - id: lab2_q57
+    title: "copy_file.yml: /etc/myapp/config.json exists on all hosts"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab2/q57_check.sh"
+
+  - id: lab2_q58
+    title: "create_backup.yml: /backup dir with mode 755, owner root:root"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab2/q58_check.sh"

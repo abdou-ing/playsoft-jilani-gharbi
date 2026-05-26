@@ -2,29 +2,62 @@
 if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
 lang="${1:-en}"
 
-# Skip-q78 guard: create john if he was not created yet
-if ! id john &>/dev/null; then
-  sudo useradd -m -s /bin/bash john 2>/dev/null || true
+inventory="/home/ansible_user/workspace/inventory"
+pb_path="/home/ansible_user/workspace/password_policy.yml"
+
+# Skip-q60 guard
+if [ ! -f "$inventory" ]; then
+  mkdir -p /home/ansible_user/workspace
+  printf '[webservers]\nweb1\nweb2\n\n[dbservers]\nbd1\n\n[all:vars]\nansible_user=ansible_user\n' > "$inventory"
+fi
+for entry in "10.30.0.11 web1" "10.30.0.12 web2" "10.30.0.13 bd1"; do
+  grep -qF "${entry%% *}" /etc/hosts 2>/dev/null || printf '%s\n' "$entry" | sudo tee -a /etc/hosts >/dev/null 2>&1 || true
+done
+if [ ! -f "/home/ansible_user/.ssh/id_rsa" ]; then
+  ssh-keygen -t rsa -b 2048 -f /home/ansible_user/.ssh/id_rsa -N "" >/dev/null 2>&1
+  for _h in web1 web2 bd1; do
+    SSHPASS='Labby123' sshpass -e ssh-copy-id -o StrictHostKeyChecking=no \
+      -i /home/ansible_user/.ssh/id_rsa.pub ansible_user@"$_h" >/dev/null 2>&1 || true
+  done
 fi
 
-# Clean state: reset password aging to defaults so the task is fresh each run
-sudo chage -M 99999 -W 7 john 2>/dev/null || true
+# Skip-q78 guard: ensure john exists
+ansible webservers -i "$inventory" -m user \
+  -a "name=john create_home=yes shell=/bin/bash state=present" \
+  --become -o >/dev/null 2>&1 || true
 
-cmd1="sudo chage -M 90 -W 7 john"
-cmd2="chage -l john"
+# Clean state: reset password aging to defaults on webservers
+ansible webservers -i "$inventory" -m command \
+  -a "chage -M 99999 -W 7 john" \
+  --become -o >/dev/null 2>&1 || true
+rm -f "$pb_path"
+
+cmd1='```yaml
+---
+- name: enforce password policy for john on webservers
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: set password max age and warning period
+      ansible.builtin.command:
+        cmd: chage -M 90 -W 7 john
+      changed_when: true
+```'
+cmd2="ansible-playbook -i $inventory $pb_path
+ansible webservers -i $inventory -m command -a 'chage -l john' --become"
 
 case "$lang" in
   en)
-    question="Security policy has now been finalized. Configure John's account so that his password expires every \`90\` days and he is warned \`7\` days before expiry."
-    hint="Use chage with -M for maximum days and -W for warning days. Run: sudo chage -M 90 -W 7 john. Verify with: chage -l john — look for 'Maximum number of days between password change: 90' and 'Number of days of warning: 7'."
-    inst1="Set the maximum password age to <span class=\"bold-green-text\">90 days</span> and the warning period to <span class=\"bold-green-text\">7 days</span> for john:"
-    inst2="Verify the new password aging policy is correctly applied to <span class=\"bold-green-text\">john</span>:"
+    question="Security policy requires that john's password expires every \`90\` days with a \`7\`-day warning on all webservers. Write a playbook at \`$pb_path\` that enforces this using \`chage\` via the \`command\` module. Run it and verify the policy is applied."
+    hint="Use ansible.builtin.command with cmd: chage -M 90 -W 7 john and become: yes. Add changed_when: true since chage does not produce output that Ansible can detect as a change. Verify with: ansible webservers -m command -a 'chage -l john' --become"
+    inst1="Write the playbook using the <span class=\"bold-green-text\">command</span> module to run <span class=\"bold-green-text\">chage</span> on each webserver:"
+    inst2="Run the playbook and verify the password aging policy is applied on all webservers:"
     ;;
   fr)
-    question="La politique de sécurité a maintenant été finalisée. Configurez le compte de John afin que son mot de passe expire tous les \`90\` jours et qu'il soit averti \`7\` jours avant l'expiration."
-    hint="Utilisez chage avec -M pour le nombre maximum de jours et -W pour les jours d'avertissement. Exécutez : sudo chage -M 90 -W 7 john. Vérifiez avec : chage -l john — cherchez 'Maximum number of days between password change: 90' et 'Number of days of warning: 7'."
-    inst1="Définissez l'âge maximum du mot de passe à <span class=\"bold-green-text\">90 jours</span> et la période d'avertissement à <span class=\"bold-green-text\">7 jours</span> pour john :"
-    inst2="Vérifiez que la nouvelle politique de vieillissement du mot de passe est correctement appliquée à <span class=\"bold-green-text\">john</span> :"
+    question="La politique de sécurité exige que le mot de passe de john expire tous les \`90\` jours avec un avertissement de \`7\` jours sur tous les webservers. Écrivez un playbook à \`$pb_path\` qui applique cela avec \`chage\` via le module \`command\`. Exécutez-le et vérifiez."
+    hint="Utilisez ansible.builtin.command avec cmd: chage -M 90 -W 7 john et become: yes. Ajoutez changed_when: true car chage ne produit pas de sortie qu'Ansible peut détecter comme un changement. Vérifiez avec : ansible webservers -m command -a 'chage -l john' --become"
+    inst1="Écrivez le playbook avec le module <span class=\"bold-green-text\">command</span> pour exécuter <span class=\"bold-green-text\">chage</span> sur chaque webserver :"
+    inst2="Exécutez le playbook et vérifiez que la politique de vieillissement du mot de passe est appliquée sur tous les webservers :"
     ;;
   *)
     echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
@@ -45,5 +78,5 @@ jq -n --indent 4 \
     "hint": $hint,
     "instructions": $instructions,
     "text": "Check",
-    "tags": "linux,chage,password-policy,security,onboarding"
+    "tags": "ansible,command,chage,password-policy,rhce"
   }'

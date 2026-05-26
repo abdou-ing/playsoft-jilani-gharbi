@@ -2,30 +2,66 @@
 if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
 lang="${1:-en}"
 
-# Skip-q78 guard: create john if he was not created yet
-if ! id john &>/dev/null; then
-  sudo useradd -m -s /bin/bash john 2>/dev/null || true
+inventory="/home/ansible_user/workspace/inventory"
+pb_path="/home/ansible_user/workspace/sudo_access.yml"
+
+# Skip-q60 guard
+if [ ! -f "$inventory" ]; then
+  mkdir -p /home/ansible_user/workspace
+  printf '[webservers]\nweb1\nweb2\n\n[dbservers]\nbd1\n\n[all:vars]\nansible_user=ansible_user\n' > "$inventory"
+fi
+for entry in "10.30.0.11 web1" "10.30.0.12 web2" "10.30.0.13 bd1"; do
+  grep -qF "${entry%% *}" /etc/hosts 2>/dev/null || printf '%s\n' "$entry" | sudo tee -a /etc/hosts >/dev/null 2>&1 || true
+done
+if [ ! -f "/home/ansible_user/.ssh/id_rsa" ]; then
+  ssh-keygen -t rsa -b 2048 -f /home/ansible_user/.ssh/id_rsa -N "" >/dev/null 2>&1
+  for _h in web1 web2 bd1; do
+    SSHPASS='Labby123' sshpass -e ssh-copy-id -o StrictHostKeyChecking=no \
+      -i /home/ansible_user/.ssh/id_rsa.pub ansible_user@"$_h" >/dev/null 2>&1 || true
+  done
 fi
 
-# Clean state: remove john from sudo group so the task is fresh each run
-sudo gpasswd -d john sudo 2>/dev/null || true
+# Skip-q78 guard: ensure john exists
+ansible webservers -i "$inventory" -m user \
+  -a "name=john create_home=yes shell=/bin/bash state=present" \
+  --become -o >/dev/null 2>&1 || true
 
-cmd1="sudo usermod -aG sudo john"
-cmd2="groups john
-sudo -l -U john"
+# Clean state: remove sudoers file for john
+ansible webservers -i "$inventory" -m file \
+  -a "path=/etc/sudoers.d/john state=absent" \
+  --become -o >/dev/null 2>&1 || true
+rm -f "$pb_path"
+
+cmd1='```yaml
+---
+- name: grant john sudo access on webservers
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: deploy sudoers drop-in file for john
+      ansible.builtin.copy:
+        content: "john ALL=(ALL) NOPASSWD:ALL\n"
+        dest: /etc/sudoers.d/john
+        owner: root
+        group: root
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s
+```'
+cmd2="ansible-playbook -i $inventory $pb_path
+ansible webservers -i $inventory -m command -a 'sudo -l -U john' --become"
 
 case "$lang" in
   en)
-    question="John complains he cannot install packages or run administrative tasks. The team policy is that developers manage software through sudo. Grant \`john\` sudo privileges by adding him to the appropriate administrative group for this Ubuntu system."
-    hint="On Ubuntu/Debian, the 'sudo' group grants sudo access. Use: sudo usermod -aG sudo john. Verify with: groups john (should list 'sudo')."
-    inst1="Add <span class=\"bold-green-text\">john</span> to the <span class=\"bold-green-text\">sudo</span> group to grant him administrative privileges:"
-    inst2="Verify that <span class=\"bold-green-text\">john</span> now belongs to the <span class=\"bold-green-text\">sudo</span> group and has sudo permissions:"
+    question="John cannot run administrative tasks yet. Write a playbook at \`$pb_path\` that grants him full sudo access on all \`webservers\` by deploying a sudoers drop-in file at \`/etc/sudoers.d/john\`. The file must be validated with visudo before being applied — never copy an unvalidated sudoers file. Run the playbook."
+    hint="Use ansible.builtin.copy with: content: 'john ALL=(ALL) NOPASSWD:ALL\n', dest: /etc/sudoers.d/john, mode: '0440', validate: /usr/sbin/visudo -cf %s. The validate parameter runs visudo on the temp file before writing — this prevents syntax errors from breaking sudo."
+    inst1="Write the playbook using <span class=\"bold-green-text\">ansible.builtin.copy</span> with the <span class=\"bold-green-text\">validate</span> parameter to safely deploy the sudoers drop-in file:"
+    inst2="Run the playbook and verify john has sudo access on all webservers:"
     ;;
   fr)
-    question="John se plaint de ne pas pouvoir installer des paquets ou exécuter des tâches administratives. La politique de l'équipe est que les développeurs gèrent les logiciels via sudo. Accordez à \`john\` les privilèges sudo en l'ajoutant au groupe administratif approprié pour ce système Ubuntu."
-    hint="Sur Ubuntu/Debian, le groupe 'sudo' accorde l'accès sudo. Utilisez : sudo usermod -aG sudo john. Vérifiez avec : groups john (doit lister 'sudo')."
-    inst1="Ajoutez <span class=\"bold-green-text\">john</span> au groupe <span class=\"bold-green-text\">sudo</span> pour lui accorder les privilèges administratifs :"
-    inst2="Vérifiez que <span class=\"bold-green-text\">john</span> appartient maintenant au groupe <span class=\"bold-green-text\">sudo</span> et dispose des permissions sudo :"
+    question="John ne peut pas encore exécuter des tâches administratives. Écrivez un playbook à \`$pb_path\` qui lui accorde l'accès sudo complet sur tous les \`webservers\` en déployant un fichier sudoers drop-in à \`/etc/sudoers.d/john\`. Le fichier doit être validé avec visudo avant d'être appliqué. Exécutez le playbook."
+    hint="Utilisez ansible.builtin.copy avec : content: 'john ALL=(ALL) NOPASSWD:ALL\n', dest: /etc/sudoers.d/john, mode: '0440', validate: /usr/sbin/visudo -cf %s. Le paramètre validate exécute visudo sur le fichier temporaire avant l'écriture — cela évite les erreurs de syntaxe qui casseraient sudo."
+    inst1="Écrivez le playbook avec <span class=\"bold-green-text\">ansible.builtin.copy</span> et le paramètre <span class=\"bold-green-text\">validate</span> pour déployer le fichier sudoers drop-in en toute sécurité :"
+    inst2="Exécutez le playbook et vérifiez que john dispose de l'accès sudo sur tous les webservers :"
     ;;
   *)
     echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
@@ -46,5 +82,5 @@ jq -n --indent 4 \
     "hint": $hint,
     "instructions": $instructions,
     "text": "Check",
-    "tags": "linux,sudo,privileges,usermod,onboarding"
+    "tags": "ansible,copy,sudo,sudoers,validate,rhce"
   }'

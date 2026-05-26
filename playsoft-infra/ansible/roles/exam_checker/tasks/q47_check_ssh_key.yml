@@ -1,0 +1,60 @@
+---
+# check_ssh_key.yml — Verify SSH key pair exists with correct properties
+#
+# check_args:
+#   host: control-node1   — which VM to run this check on
+#   user: ansible_user    — owner of the SSH key
+
+- name: "{{ exam_task.id }} | SSH key check on {{ exam_task.check_args.host }}"
+  when: inventory_hostname == exam_task.check_args.host
+  block:
+    - name: "{{ exam_task.id }} | Verify SSH key existence, format, permissions and strength"
+      ansible.builtin.shell: |
+        home="/home/{{ exam_task.check_args.user }}"
+        key_file=""
+        [ -f "$home/.ssh/id_rsa" ]     && key_file="$home/.ssh/id_rsa"
+        [ -f "$home/.ssh/id_ed25519" ] && key_file="$home/.ssh/id_ed25519"
+        [ -z "$key_file" ] && exit 1
+
+        # Non-empty
+        [ -s "$key_file" ] || exit 1
+
+        # Valid PEM header (OPENSSH or legacy RSA)
+        first=$(head -1 "$key_file")
+        case "$first" in
+          "-----BEGIN OPENSSH PRIVATE KEY-----"|"-----BEGIN RSA PRIVATE KEY-----") ;;
+          *) exit 1 ;;
+        esac
+
+        # Permissions must be 600 or 400
+        perms=$(stat -c "%a" "$key_file" 2>/dev/null)
+        [[ "$perms" == "600" || "$perms" == "400" ]] || exit 1
+
+        # No passphrase
+        ssh-keygen -y -P "" -f "$key_file" &>/dev/null || exit 1
+
+        # Public key must exist
+        [ -f "${key_file}.pub" ] || exit 1
+
+        # RSA keys must be at least 2048 bits
+        key_type=$(ssh-keygen -l -f "$key_file" 2>/dev/null | awk '{gsub(/[()]/,"",$NF); print $NF}')
+        if [ "$key_type" = "RSA" ]; then
+          bits=$(ssh-keygen -l -f "$key_file" 2>/dev/null | awk '{print $1}')
+          [ "${bits:-0}" -ge 2048 ] || exit 1
+        fi
+        exit 0
+      register: _ssh_key_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: "{{ exam_task.id }} | Record result"
+      set_fact:
+        exam_results: >-
+          {{
+            exam_results + [{
+              'id': exam_task.id,
+              'title': exam_task.title,
+              'host': inventory_hostname,
+              'passed': (_ssh_key_check.rc == 0)
+            }]
+          }}

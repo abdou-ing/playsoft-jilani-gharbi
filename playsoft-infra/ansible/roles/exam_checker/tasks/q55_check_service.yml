@@ -1,0 +1,51 @@
+---
+# check_service.yml — Verify a service is installed, active, and enabled
+#
+# check_args:
+#   name: httpd             — service/package name
+#   hosts: all|hostname     — where to run
+#   active: true            — check systemctl is-active (default: true)
+#   enabled: true           — check systemctl is-enabled (default: true)
+
+- name: "{{ exam_task.id }} | Service check: {{ exam_task.check_args.name }}"
+  when: >
+    exam_task.check_args.hosts == 'all' or
+    inventory_hostname in ([exam_task.check_args.hosts] | flatten)
+  block:
+    - name: "{{ exam_task.id }} | Check {{ exam_task.check_args.name }} is installed"
+      ansible.builtin.shell: >
+        rpm -q {{ exam_task.check_args.name }} 2>/dev/null ||
+        dpkg -s {{ exam_task.check_args.name }} 2>/dev/null | grep -q "Status: install ok installed"
+      register: _svc_installed
+      ignore_errors: true
+      changed_when: false
+
+    - name: "{{ exam_task.id }} | Check {{ exam_task.check_args.name }} is active"
+      ansible.builtin.shell: "systemctl is-active {{ exam_task.check_args.name }}"
+      register: _svc_active
+      ignore_errors: true
+      changed_when: false
+      when: exam_task.check_args.active | default(true) | bool
+
+    - name: "{{ exam_task.id }} | Check {{ exam_task.check_args.name }} is enabled"
+      ansible.builtin.shell: "systemctl is-enabled {{ exam_task.check_args.name }}"
+      register: _svc_enabled
+      ignore_errors: true
+      changed_when: false
+      when: exam_task.check_args.enabled | default(true) | bool
+
+    - name: "{{ exam_task.id }} | Record result"
+      set_fact:
+        exam_results: >-
+          {{
+            exam_results + [{
+              'id': exam_task.id,
+              'title': exam_task.title,
+              'host': inventory_hostname,
+              'passed': (
+                (_svc_installed.rc == 0) and
+                (not (exam_task.check_args.active | default(true) | bool) or (_svc_active.rc | default(1)) == 0) and
+                (not (exam_task.check_args.enabled | default(true) | bool) or (_svc_enabled.rc | default(1)) == 0)
+              )
+            }]
+          }}

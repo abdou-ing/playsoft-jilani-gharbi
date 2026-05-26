@@ -1,0 +1,55 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# rhce_lab3_check.yml — Grade Lab 3 (Variables and Ansible Facts)
+#
+# Usage:
+#   ansible-playbook -i <inventory> rhce_lab3_check.yml
+#
+# Prerequisites: Lab 1 must be fully completed (SSH keys, inventory, ansible.cfg).
+#
+# Checks q60:
+#   q60  report.yml — /root/report.txt on all hosts filled with Ansible Facts
+#        (HOST, MEMORY, BIOS, SDA_DISK_SIZE, SDB_DISK_SIZE)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Play 1: Run all lab3 checks on the exam nodes
+- name: "RHCE Lab 3 — Run checks on exam nodes"
+  hosts: exam_nodes
+  gather_facts: true
+  become: true
+  vars_files:
+    - vars/rhce_lab3_tasks.yml
+  roles:
+    - exam_checker
+
+# Play 2: Aggregate and print results
+- name: "RHCE Lab 3 — Print Results"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/rhce_lab3_tasks.yml
+  tasks:
+    - name: Aggregate results from all exam nodes
+      set_fact:
+        all_results: "{{ all_results | default([]) + (hostvars[item].exam_results | default([])) }}"
+      loop: "{{ groups['exam_nodes'] }}"
+
+    - name: Calculate score
+      set_fact:
+        passed_count: "{{ all_results | selectattr('passed', 'equalto', true) | list | length }}"
+        total_count: "{{ all_results | length }}"
+
+    - name: Print lab3 results
+      debug:
+        msg: |
+          ════════════════════════════════════════════════════════
+           RHCE LAB 3 RESULTS — Variables and Ansible Facts
+          ════════════════════════════════════════════════════════
+          {% for result in all_results %}
+          {% if result.passed %}  ✅ PASS{% else %}  ❌ FAIL{% endif %}  [{{ result.host | upper }}]  {{ result.id }}: {{ result.title }}
+          {% endfor %}
+          ════════════════════════════════════════════════════════
+           Score: {{ passed_count }} / {{ total_count }}
+           Grade: {% if (passed_count | int / total_count | int * 100) >= 70 %}PASSED ✅{% else %}FAILED ❌{% endif %}
+
+          ════════════════════════════════════════════════════════

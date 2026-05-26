@@ -1,0 +1,49 @@
+---
+# check_inventory_group.yml — Verify a hostname appears under a specific group in the candidate's inventory
+#
+# check_args:
+#   host: control-node1                   — VM that holds the inventory file
+#   inventory: /home/ansible_user/inventory
+#   hostname: web1                        — hostname to look for
+#   group: webservers1                    — group it must be under
+
+- name: "{{ exam_task.id }} | Inventory group check: {{ exam_task.check_args.hostname }} in [{{ exam_task.check_args.group }}]"
+  when: inventory_hostname == exam_task.check_args.host
+  block:
+    - name: "{{ exam_task.id }} | Check {{ exam_task.check_args.hostname }} is under [{{ exam_task.check_args.group }}]"
+      ansible.builtin.shell: |
+        inv="{{ exam_task.check_args.inventory }}"
+        host="{{ exam_task.check_args.hostname }}"
+        group="{{ exam_task.check_args.group }}"
+        [ -f "$inv" ] || exit 1
+        python3 - "$inv" "$host" "$group" << 'PYEOF'
+        import sys
+        inv, host, group = sys.argv[1], sys.argv[2], sys.argv[3]
+        current = None
+        with open(inv) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if line.startswith('[') and line.endswith(']'):
+                    # Strip :children/:vars suffixes
+                    current = line[1:-1].split(':')[0]
+                elif line.split()[0] == host:
+                    sys.exit(0 if current == group else 1)
+        sys.exit(1)
+        PYEOF
+      register: _inv_group_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: "{{ exam_task.id }} | Record result"
+      set_fact:
+        exam_results: >-
+          {{
+            exam_results + [{
+              'id': exam_task.id,
+              'title': exam_task.title,
+              'host': inventory_hostname,
+              'passed': (_inv_group_check.rc == 0)
+            }]
+          }}

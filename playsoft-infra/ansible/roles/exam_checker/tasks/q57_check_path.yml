@@ -1,0 +1,56 @@
+---
+# check_path.yml — Verify a path exists with optional type, mode, owner, and group
+#
+# check_args:
+#   path: /backup               — path to verify
+#   hosts: all|hostname         — where to run
+#   type: directory|file        — expected type (optional)
+#   mode: "755"                 — expected octal permissions (optional)
+#   owner: root                 — expected owner (optional)
+#   group: root                 — expected group (optional)
+
+- name: "{{ exam_task.id }} | Path check: {{ exam_task.check_args.path }}"
+  when: >
+    exam_task.check_args.hosts == 'all' or
+    inventory_hostname in ([exam_task.check_args.hosts] | flatten)
+  block:
+    - name: "{{ exam_task.id }} | Verify {{ exam_task.check_args.path }} properties"
+      ansible.builtin.shell: |
+        path="{{ exam_task.check_args.path }}"
+
+        test -e "$path" || exit 1
+
+        {% if exam_task.check_args.type is defined and exam_task.check_args.type == 'directory' %}
+        test -d "$path" || exit 1
+        {% elif exam_task.check_args.type is defined and exam_task.check_args.type == 'file' %}
+        test -f "$path" || exit 1
+        {% endif %}
+
+        {% if exam_task.check_args.mode is defined %}
+        [ "$(stat -c '%a' "$path")" = "{{ exam_task.check_args.mode }}" ] || exit 1
+        {% endif %}
+
+        {% if exam_task.check_args.owner is defined %}
+        [ "$(stat -c '%U' "$path")" = "{{ exam_task.check_args.owner }}" ] || exit 1
+        {% endif %}
+
+        {% if exam_task.check_args.group is defined %}
+        [ "$(stat -c '%G' "$path")" = "{{ exam_task.check_args.group }}" ] || exit 1
+        {% endif %}
+
+        exit 0
+      register: _path_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: "{{ exam_task.id }} | Record result"
+      set_fact:
+        exam_results: >-
+          {{
+            exam_results + [{
+              'id': exam_task.id,
+              'title': exam_task.title,
+              'host': inventory_hostname,
+              'passed': (_path_check.rc == 0)
+            }]
+          }}

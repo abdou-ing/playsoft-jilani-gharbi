@@ -10,35 +10,33 @@ fi
 lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
+pb_path="/home/ansible_user/workspace/account_expiry.yml"
+inventory="/home/ansible_user/workspace/inventory"
+
 declare -A messages_en=(
-  ["no_user"]="User 'john' does not exist. Create it first: sudo useradd -m -s /bin/bash john"
-  ["no_expiry"]="John's account expiry is not set (shows 'never'). Set it with: sudo chage -E 2026-12-31 john"
-  ["wrong_expiry"]="John's account expiry is not set to 2026-12-31. Run: sudo chage -E 2026-12-31 john — then verify with: chage -l john"
+  ["no_file"]="Playbook not found at $pb_path. Create it first."
+  ["no_chage"]="The playbook does not call chage. Use the command module: cmd: chage -E 2026-12-31 john"
+  ["wrong_expiry"]="John's account expiry is not set to 2026-12-31 on web1. Run the playbook: ansible-playbook -i $inventory $pb_path"
 )
 declare -A messages_fr=(
-  ["no_user"]="L'utilisateur 'john' n'existe pas. Créez-le d'abord : sudo useradd -m -s /bin/bash john"
-  ["no_expiry"]="L'expiration du compte de john n'est pas définie (affiche 'never'). Définissez-la avec : sudo chage -E 2026-12-31 john"
-  ["wrong_expiry"]="L'expiration du compte de john n'est pas définie au 2026-12-31. Exécutez : sudo chage -E 2026-12-31 john — puis vérifiez avec : chage -l john"
+  ["no_file"]="Playbook introuvable à $pb_path. Créez-le d'abord."
+  ["no_chage"]="Le playbook n'appelle pas chage. Utilisez le module command : cmd: chage -E 2026-12-31 john"
+  ["wrong_expiry"]="La date d'expiration du compte de john n'est pas définie au 2026-12-31 sur web1. Exécutez le playbook : ansible-playbook -i $inventory $pb_path"
 )
 
 get_message() { declare -n _m="messages_$lang"; echo "{\"result\": \"${_m[$1]}\"}"; }
 
-if ! id john &>/dev/null; then
-  echo "$(get_message no_user)"; exit 0
+if [ ! -f "$pb_path" ]; then
+  echo "$(get_message no_file)"; exit 0
 fi
 
-chage_output=$(sudo chage -l john 2>/dev/null)
-expiry_line=$(echo "$chage_output" | grep -i "Account expires")
-
-if echo "$expiry_line" | grep -qi "never"; then
-  echo "$(get_message no_expiry)"; exit 0
+if ! grep -q "chage" "$pb_path"; then
+  echo "$(get_message no_chage)"; exit 0
 fi
 
-if ! echo "$expiry_line" | grep -q "2026"; then
-  echo "$(get_message wrong_expiry)"; exit 0
-fi
+chage_output=$(ansible web1 -i "$inventory" -m command -a "chage -l john" --become 2>/dev/null)
 
-if ! echo "$expiry_line" | grep -qi "dec" || ! echo "$expiry_line" | grep -q "31"; then
+if ! echo "$chage_output" | grep -i "Account expires" | grep -q "2026"; then
   echo "$(get_message wrong_expiry)"; exit 0
 fi
 

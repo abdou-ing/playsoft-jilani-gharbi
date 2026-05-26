@@ -8,28 +8,32 @@ exam_tasks:
 
   - id: setup_01_python3
     title: "Installer python3 sur les 3 machines"
-    check_type: package
+    check_type: service
     check_args:
       name: python3
       hosts: "all"
+      active: false
+      enabled: false
 
   - id: setup_02_ansible_core
     title: "Installer ansible-core sur le control node"
-    check_type: package
+    check_type: service
     check_args:
       name: ansible-core
       hosts: "control-node1"
+      active: false
+      enabled: false
 
   - id: setup_03_ansible_user
     title: "Créer l'utilisateur ansible"
-    check_type: user_exists
+    check_type: user_attrs
     check_args:
       name: ansible
       hosts: "all"
 
   - id: setup_04_sudoers
     title: "Configurer sudoers pour ansible"
-    check_type: file_contains
+    check_type: file_entry
     check_args:
       path: /etc/sudoers.d/ansible
       pattern: "ansible.*NOPASSWD"
@@ -47,19 +51,20 @@ exam_tasks:
 
   - id: setup_06_inventory
     title: "Créer le fichier inventaire"
-    check_type: file_contains
+    check_type: file_entry
     check_args:
       path: /home/ansible/inventory
-      pattern: "target-node1"
+      line: "target-node1"
       hosts: "control-node1"
 
   - id: setup_07_ansible_cfg
     title: "Créer ansible.cfg"
-    check_type: file_contains
+    check_type: ansible_cfg
     check_args:
-      path: /home/ansible/ansible.cfg
-      pattern: "remote_user=ansible"
-      hosts: "control-node1"
+      host: control-node1
+      cfg: /home/ansible/ansible.cfg
+      inventory: /home/ansible/inventory
+      user: ansible
 
   - id: setup_08_ping
     title: "Tester ansible ping"

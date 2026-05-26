@@ -1,0 +1,49 @@
+---
+# check_ansible_cfg.yml — Verify ansible.cfg has the required sections and key=value pairs
+#
+# check_args:
+#   host: control-node1                       — VM that holds the config
+#   cfg: /home/ansible_user/ansible.cfg
+#   inventory: /home/ansible_user/inventory
+#   user: ansible_user                        — expected remote_user value
+
+- name: "{{ exam_task.id }} | ansible.cfg check on {{ exam_task.check_args.host }}"
+  when: inventory_hostname == exam_task.check_args.host
+  block:
+    - name: "{{ exam_task.id }} | Verify ansible.cfg sections and values"
+      ansible.builtin.shell: |
+        cfg="{{ exam_task.check_args.cfg }}"
+        inventory="{{ exam_task.check_args.inventory }}"
+        user="{{ exam_task.check_args.user | default('ansible_user') }}"
+        [ -s "$cfg" ] || exit 1
+        python3 - "$cfg" "$inventory" "$user" << 'PYEOF'
+        import configparser, sys
+        cfg, inventory, user = sys.argv[1], sys.argv[2], sys.argv[3]
+        c = configparser.RawConfigParser()
+        if not c.read(cfg):
+            sys.exit(1)
+        try:
+            assert c.has_section('defaults'), 'no [defaults]'
+            assert c.has_section('privilege_escalation'), 'no [privilege_escalation]'
+            assert c.get('defaults', 'remote_user') == user, 'wrong remote_user'
+            assert c.get('defaults', 'inventory') == inventory, 'wrong inventory'
+            assert c.get('privilege_escalation', 'become') == 'true', 'become != true'
+        except (configparser.NoSectionError, configparser.NoOptionError, AssertionError) as e:
+            sys.exit(1)
+        sys.exit(0)
+        PYEOF
+      register: _cfg_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: "{{ exam_task.id }} | Record result"
+      set_fact:
+        exam_results: >-
+          {{
+            exam_results + [{
+              'id': exam_task.id,
+              'title': exam_task.title,
+              'host': inventory_hostname,
+              'passed': (_cfg_check.rc == 0)
+            }]
+          }}

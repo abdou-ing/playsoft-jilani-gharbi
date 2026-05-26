@@ -1,0 +1,104 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# RHCE Exam — White Test (Practice Exam)
+#
+# Each task uploads its bash check script to check_host and runs it there.
+# The scripts output {"result":"0"} for pass, {"result":"<msg>"} for fail.
+#
+# All exam scripts run on control-node1 — they use the candidate's ansible
+# to reach the managed nodes (web1 / web2) for state verification.
+#
+# Prerequisites: Lab 1 fully completed (SSH keys, inventory, ansible.cfg).
+# ─────────────────────────────────────────────────────────────────────────────
+
+exam_tasks:
+
+  - id: exam_q01
+    title: "Configure Ansible: inventory with correct groups + ansible.cfg with required settings"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q01_check.sh"
+
+  - id: exam_q02
+    title: "apt-pack.sh: ad-hoc script using community.general.apt_repository to add apt sources on all nodes"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q02_check.sh"
+
+  - id: exam_q03
+    title: "packages.yml: php+mariadb-client on dev/test/prod, build-essential + apt upgrade on dev"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q03_check.sh"
+
+  - id: exam_q04
+    title: "timesync.yml: chrony installed, configured with NTP 172.25.254.250, service running"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q04_check.sh"
+
+  - id: exam_q05
+    title: "apache role + newrole.yml: apache2 installed/running, index.html template with FQDN+IP"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q05_check.sh"
+
+  - id: exam_q06
+    title: "roles/requirements.yml: two Galaxy roles (balancer, phpinfo) from GitHub URLs"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q06_check.sh"
+
+  - id: exam_q07
+    title: "balance.yml: 3 plays — gather facts / balancer role on balancers / phpinfo role on webservers"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q07_check.sh"
+
+  - id: exam_q08
+    title: "web.yml: webdev group, /webdev dir mode 02775, symlink /var/www/html/mywebdev, index.html with 'Development'"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q08_check.sh"
+
+  - id: exam_q09
+    title: "vault.yml: encrypted with 'atenorth', contains dev_pass+mgr_pass; password.txt mode 0600"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q09_check.sh"
+
+  - id: exam_q10
+    title: "hosts.j2 template + gen_hosts.yml: /etc/myhosts on dev hosts with IP/FQDN/hostname loop"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q10_check.sh"
+
+  - id: exam_q11
+    title: "hwreport.yml + hwreport.j2: /root/hwreport.txt on all hosts with FQDN, memory, BIOS, disk sizes"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q11_check.sh"
+
+  - id: exam_q12
+    title: "issue.yml: /etc/issue = Development on dev, Test on test, Production on prod (with when: conditions)"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q12_check.sh"
+
+  - id: exam_q13
+    title: "Rekey vault: secret.yml rekeyed from 'curabete' to 'newvare'"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q13_check.sh"
+
+  - id: exam_q14
+    title: "create_user.yml + user_list.yml: adam/lucifer on dev+test, gabriel on prod, using vault passwords"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q14_check.sh"
+
+  - id: exam_q15
+    title: "storage.yml: LVM block/rescue/always — LV 'data' in VG 'research' with ext4 filesystem"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q15_check.sh"
+
+  - id: exam_q16
+    title: "cron.yml: natasha user cron job every */2 minutes running 'logger EX294 in progress'"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q16_check.sh"
+
+  - id: exam_q17
+    title: "mycollections/requirements.yml: ansible.posix + community.general installed"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q17_check.sh"
+
+  - id: exam_q18
+    title: "selinux.yml: ansible.posix.selinux with state=permissive, policy=targeted on all hosts"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/white-test/q18_check.sh"

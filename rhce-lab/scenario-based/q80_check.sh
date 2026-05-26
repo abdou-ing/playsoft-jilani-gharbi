@@ -10,23 +10,52 @@ fi
 lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
+pb_path="/home/ansible_user/workspace/sudo_access.yml"
+inventory="/home/ansible_user/workspace/inventory"
+
 declare -A messages_en=(
-  ["no_user"]="User 'john' does not exist. Create it first: sudo useradd -m -s /bin/bash john"
-  ["no_sudo"]="john is not in the sudo group. Grant sudo access with: sudo usermod -aG sudo john"
+  ["no_file"]="Playbook not found at $pb_path. Create it first."
+  ["no_copy"]="The playbook does not use the 'copy' module. Use ansible.builtin.copy to deploy /etc/sudoers.d/john."
+  ["no_validate"]="The copy task is missing the 'validate' parameter. Always validate sudoers files: validate: /usr/sbin/visudo -cf %s"
+  ["no_sudoers"]="/etc/sudoers.d/john does not exist on web1. Run the playbook: ansible-playbook -i $inventory $pb_path"
+  ["wrong_perms"]="/etc/sudoers.d/john exists on web1 but has wrong permissions. It must be mode 0440 (owned by root)."
+  ["wrong_content"]="/etc/sudoers.d/john exists but does not grant john the correct sudo privileges. Check the content: 'john ALL=(ALL) NOPASSWD:ALL'"
 )
 declare -A messages_fr=(
-  ["no_user"]="L'utilisateur 'john' n'existe pas. Créez-le d'abord : sudo useradd -m -s /bin/bash john"
-  ["no_sudo"]="john n'est pas dans le groupe sudo. Accordez l'accès sudo avec : sudo usermod -aG sudo john"
+  ["no_file"]="Playbook introuvable à $pb_path. Créez-le d'abord."
+  ["no_copy"]="Le playbook n'utilise pas le module 'copy'. Utilisez ansible.builtin.copy pour déployer /etc/sudoers.d/john."
+  ["no_validate"]="La tâche copy n'a pas le paramètre 'validate'. Validez toujours les fichiers sudoers : validate: /usr/sbin/visudo -cf %s"
+  ["no_sudoers"]="/etc/sudoers.d/john n'existe pas sur web1. Exécutez le playbook : ansible-playbook -i $inventory $pb_path"
+  ["wrong_perms"]="/etc/sudoers.d/john existe sur web1 mais a de mauvaises permissions. Il doit être en mode 0440 (appartenant à root)."
+  ["wrong_content"]="/etc/sudoers.d/john existe mais n'accorde pas les bons privilèges sudo à john. Vérifiez le contenu : 'john ALL=(ALL) NOPASSWD:ALL'"
 )
 
 get_message() { declare -n _m="messages_$lang"; echo "{\"result\": \"${_m[$1]}\"}"; }
 
-if ! id john &>/dev/null; then
-  echo "$(get_message no_user)"; exit 0
+if [ ! -f "$pb_path" ]; then
+  echo "$(get_message no_file)"; exit 0
 fi
 
-if ! id john | grep -q "(sudo)"; then
-  echo "$(get_message no_sudo)"; exit 0
+if ! grep -q "copy:" "$pb_path" && ! grep -q "ansible.builtin.copy" "$pb_path"; then
+  echo "$(get_message no_copy)"; exit 0
+fi
+
+if ! grep -q "validate" "$pb_path"; then
+  echo "$(get_message no_validate)"; exit 0
+fi
+
+stat_result=$(ansible web1 -i "$inventory" -m stat -a "path=/etc/sudoers.d/john" --become 2>/dev/null)
+if ! echo "$stat_result" | grep -q '"exists": true'; then
+  echo "$(get_message no_sudoers)"; exit 0
+fi
+
+if ! echo "$stat_result" | grep -q '"mode": "0440"'; then
+  echo "$(get_message wrong_perms)"; exit 0
+fi
+
+content_result=$(ansible web1 -i "$inventory" -m command -a "cat /etc/sudoers.d/john" --become 2>/dev/null)
+if ! echo "$content_result" | grep -qiE "john.*ALL.*ALL.*NOPASSWD"; then
+  echo "$(get_message wrong_content)"; exit 0
 fi
 
 echo '{"result": "0"}'

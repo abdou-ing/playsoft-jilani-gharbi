@@ -1,0 +1,59 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# RHCE Lab 3 — Variables and Ansible Facts
+#
+# Each task uploads its bash check script to check_host and runs it there.
+# The scripts output {"result":"0"} for pass, {"result":"<msg>"} for fail.
+#
+# All lab3 scripts run on control-node1 — they use the candidate's ansible
+# to reach the managed nodes (web1 / web2) for state verification.
+#
+# Prerequisites: Lab 1 fully completed (SSH keys, inventory, ansible.cfg).
+# ─────────────────────────────────────────────────────────────────────────────
+
+exam_tasks:
+
+  - id: lab3_q60
+    title: "report.yml: /root/report.txt on all hosts contains correct Ansible Facts (HOST, MEMORY, BIOS, SDA_DISK_SIZE, SDB_DISK_SIZE)"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab3/q60_check.sh"
+
+  - id: lab3_q61
+    title: "vars_motd.yml: /etc/motd on all hosts contains hostname + 'PlaySoft' from vars: section"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab3/q61_check.sh"
+
+  - id: lab3_q62
+    title: "install_from_vars.yml + my_package.yml: curl installed via vars_files on all hosts"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab3/q62_check.sh"
+
+  - id: lab3_q63
+    title: "network_info.yml: /root/network_info.txt on all hosts contains correct IP and FQDN facts"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab3/q63_check.sh"
+
+  - id: lab3_q64
+    title: "os_report.yml: /root/os_report.txt on all hosts contains correct OS, VERSION, KERNEL facts"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab3/q64_check.sh"
+
+  - id: lab3_q65
+    title: "register_vars.yml: register command output, write hostname to /root/registered_hostname.txt"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab3/q65_check.sh"
+
+  - id: lab3_q66
+    title: "set_fact_vars.yml: set_fact env_label='<hostname>-prod', write to /root/env_label.txt"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab3/q66_check.sh"
+
+  - id: lab3_q67
+    title: "magic_vars.yml: inventory_hostname + group_names written to /root/inventory_info.txt"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab3/q67_check.sh"
+
+  - id: lab3_q68
+    title: "dict_vars.yml: app_config dict (myapp/8080/production) written to /root/app_config.txt"
+    check_host: control-node1
+    check_script: "{{ playbook_dir }}/../../rhce-lab/lab3/q68_check.sh"
