@@ -4,22 +4,6 @@ lang="${1:-en}"
 
 inventory="/home/ansible_user/workspace/inventory"
 
-# Skip-q60 guard
-if [ ! -f "$inventory" ]; then
-  mkdir -p /home/ansible_user/workspace
-  printf '[webservers]\nweb1\nweb2\n\n[dbservers]\nbd1\n\n[all:vars]\nansible_user=ansible_user\n' > "$inventory"
-fi
-for entry in "10.30.0.11 web1" "10.30.0.12 web2" "10.30.0.13 bd1"; do
-  grep -qF "${entry%% *}" /etc/hosts 2>/dev/null || printf '%s\n' "$entry" | sudo tee -a /etc/hosts >/dev/null 2>&1 || true
-done
-if [ ! -f "/home/ansible_user/.ssh/id_rsa" ]; then
-  ssh-keygen -t rsa -b 2048 -f /home/ansible_user/.ssh/id_rsa -N "" >/dev/null 2>&1
-  for _h in web1 web2 bd1; do
-    SSHPASS='Labby123' sshpass -e ssh-copy-id -o StrictHostKeyChecking=no \
-      -i /home/ansible_user/.ssh/id_rsa.pub ansible_user@"$_h" >/dev/null 2>&1 || true
-  done
-fi
-
 pb_path="/home/ansible_user/workspace/onboard_john.yml"
 
 # Clean state: remove john from webservers so the task starts fresh
@@ -40,21 +24,23 @@ cmd1='```yaml
         shell: /bin/bash
         state: present
 ```'
-cmd2="ansible-playbook -i $inventory $pb_path
-ansible webservers -i $inventory -m command -a 'id john' --become"
+cmd2="\`\`\`shell
+ansible-playbook -i $inventory $pb_path
+ansible webservers -i $inventory -m command -a 'id john' --become
+\`\`\`"
 
 case "$lang" in
   en)
-    question="A new junior developer, John, is joining the team. Write a playbook at \`$pb_path\` that creates the user \`john\` with a home directory and \`/bin/bash\` as his login shell on all \`webservers\`. Run it."
+    question="A new junior developer, John, is joining the team. Write a playbook at \`$pb_path\` that creates the user \`john\` with a **home directory** and \`/bin/bash\` as his **login shell** on all \`webservers\`. Run it."
     hint="Use the ansible.builtin.user module with: name: john, create_home: yes, shell: /bin/bash, state: present. Target hosts: webservers. You need become: yes to manage users. Verify with: ansible webservers -m command -a 'id john' --become"
-    inst1="Write the playbook using the <span class=\"bold-green-text\">user</span> module — this is the idempotent way to create system users with Ansible:"
-    inst2="Run the playbook and verify john exists on all webservers:"
+    inst1="Write the playbook at \`$pb_path\` using the \`user\` module — this is the idempotent way to create system users with Ansible:"
+    inst2="Run the playbook at \`$pb_path\` and verify john exists on all webservers:"
     ;;
   fr)
-    question="L'histoire : 'Provisionnement de l'équipe dev via Ansible'. Un nouveau développeur junior, John, rejoint l'équipe. Écrivez un playbook à \`$pb_path\` qui crée l'utilisateur \`john\` avec un répertoire home et \`/bin/bash\` comme shell de connexion sur tous les \`webservers\`. Exécutez-le."
+    question="L'histoire : 'Provisionnement de l'équipe dev via Ansible'. Un nouveau développeur junior, John, rejoint l'équipe. Écrivez un playbook à \`$pb_path\` qui crée l'utilisateur \`john\` avec un **répertoire home** et \`/bin/bash\` comme **shell de connexion** sur tous les \`webservers\`. Exécutez-le."
     hint="Utilisez le module ansible.builtin.user avec : name: john, create_home: yes, shell: /bin/bash, state: present. Ciblez hosts: webservers. Vous avez besoin de become: yes pour gérer les utilisateurs. Vérifiez avec : ansible webservers -m command -a 'id john' --become"
-    inst1="Écrivez le playbook avec le module <span class=\"bold-green-text\">user</span> — c'est la méthode idempotente pour créer des utilisateurs système avec Ansible :"
-    inst2="Exécutez le playbook et vérifiez que john existe sur tous les webservers :"
+    inst1="Écrivez le playbook à \`$pb_path\` avec le module \`user\` — c'est la méthode idempotente pour créer des utilisateurs système avec Ansible :"
+    inst2="Exécutez le playbook à \`$pb_path\` et vérifiez que john existe sur tous les webservers :"
     ;;
   *)
     echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;

@@ -2,47 +2,72 @@
 if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
 lang="${1:-en}"
 
-cmd1="ansible-doc ansible.builtin.service | grep -A5 'state:'"
+inventory="/home/ansible_user/workspace/inventory"
+pb_path="/home/ansible_user/workspace/ntp_config.yml"
 
-answer_a="ansible.builtin.service"
-answer_b="ansible.builtin.systemd"
-answer_c="ansible.builtin.command"
-answer_d="ansible.builtin.daemon"
-solution="$answer_a"
+# Clean state: remove NTP server config from webservers
+ansible webservers -i "$inventory" -m lineinfile \
+  -a "path=/etc/systemd/timesyncd.conf regexp='^NTP=' state=absent" \
+  --become -o >/dev/null 2>&1 || true
+ansible webservers -i "$inventory" -m service \
+  -a "name=systemd-timesyncd state=restarted" \
+  --become -o >/dev/null 2>&1 || true
+rm -f "$pb_path"
+
+cmd1='```yaml
+---
+- name: configure NTP on webservers
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: set NTP server in timesyncd.conf
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/timesyncd.conf
+        regexp: "^NTP="
+        line: "NTP=pool.ntp.org"
+
+    - name: restart systemd-timesyncd
+      ansible.builtin.service:
+        name: systemd-timesyncd
+        state: restarted
+        enabled: yes
+```'
+cmd2="\`\`\`shell
+ansible-playbook -i $inventory $pb_path
+ansible webservers -i $inventory -m command -a 'grep NTP /etc/systemd/timesyncd.conf' --become
+\`\`\`"
 
 case "$lang" in
   en)
-    question="After modifying SSH configuration files on the webservers, you need to ensure the SSH daemon is restarted to apply changes, and enabled to start at boot. Which Ansible module manages service state (started, stopped, restarted) and boot enablement across Linux distributions without needing to know the init system?"
-    hint="This module provides a consistent interface for managing services regardless of whether the system uses systemd, SysV init, or Upstart. It supports: name, state (started/stopped/restarted/reloaded), enabled, and daemon_reload. Run: ansible-doc ansible.builtin.service"
-    inst1="Explore the module documentation to see state options:"
+    question="All \`webservers\` must **synchronize time** using \`pool.ntp.org\`. Write a playbook at \`$pb_path\` that sets \`NTP=pool.ntp.org\` in \`/etc/systemd/timesyncd.conf\` using \`lineinfile\`, then **restarts and enables** the \`systemd-timesyncd\` service."
+    hint="Use ansible.builtin.lineinfile with regexp: '^NTP=' and line: 'NTP=pool.ntp.org' to set the NTP server. Then use ansible.builtin.service with name: systemd-timesyncd, state: restarted, enabled: yes. Verify: ansible webservers -m command -a 'grep NTP /etc/systemd/timesyncd.conf' --become"
+    inst1="Write the playbook at \`$pb_path\` — configure the \`NTP\` server with lineinfile, then restart timesyncd:"
+    inst2="Run the playbook and verify the NTP configuration on all webservers:"
     ;;
   fr)
-    question="Après avoir modifié les fichiers de configuration SSH sur les webservers, vous devez vous assurer que le démon SSH est redémarré pour appliquer les changements, et activé au démarrage. Quel module Ansible gère l'état des services (started, stopped, restarted) et l'activation au démarrage sur les distributions Linux sans avoir besoin de connaître le système d'init ?"
-    hint="Ce module fournit une interface cohérente pour gérer les services qu'il utilise systemd, SysV init ou Upstart. Il supporte : name, state (started/stopped/restarted/reloaded), enabled, et daemon_reload. Exécutez : ansible-doc ansible.builtin.service"
-    inst1="Explorez la documentation du module pour voir les options d'état :"
+    question="Tous les \`webservers\` doivent **synchroniser l'heure** avec \`pool.ntp.org\`. Écrivez un playbook à \`$pb_path\` qui définit \`NTP=pool.ntp.org\` dans \`/etc/systemd/timesyncd.conf\` avec \`lineinfile\`, puis **redémarre et active** le service \`systemd-timesyncd\`."
+    hint="Utilisez ansible.builtin.lineinfile avec regexp: '^NTP=' et line: 'NTP=pool.ntp.org' pour définir le serveur NTP. Ensuite utilisez ansible.builtin.service avec name: systemd-timesyncd, state: restarted, enabled: yes. Vérifiez : ansible webservers -m command -a 'grep NTP /etc/systemd/timesyncd.conf' --become"
+    inst1="Écrivez le playbook à \`$pb_path\` — configurez le serveur \`NTP\` avec lineinfile, puis redémarrez timesyncd :"
+    inst2="Exécutez le playbook et vérifiez la configuration NTP sur tous les webservers :"
     ;;
   *)
     echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
 esac
 
-answers=("\"answer_a\":\"$answer_a\"" "\"answer_b\":\"$answer_b\"" "\"answer_c\":\"$answer_c\"" "\"answer_d\":\"$answer_d\"")
-shuffled=$(printf "%s\n" "${answers[@]}" | shuf | paste -sd,)
+instructions=$(jq -n --arg inst1 "$inst1" --arg cmd1 "$cmd1" --arg inst2 "$inst2" --arg cmd2 "$cmd2" \
+  '[{"instruction": $inst1, "command": $cmd1}, {"instruction": $inst2, "command": $cmd2}]')
 
 jq -n --indent 4 \
   --arg question "$question" \
   --arg hint "$hint" \
-  --arg inst1 "$inst1" \
-  --arg cmd1 "$cmd1" \
-  --arg solution "$solution" \
-  --argjson answers "{$shuffled}" \
+  --argjson instructions "$instructions" \
   '{
     "question": $question,
-    "type": "multi",
-    "answers": $answers,
-    "hint": $hint,
-    "instructions": [{"instruction": $inst1, "command": $cmd1}],
-    "solution": $solution,
     "plateforme_required": "container",
     "os_required": "ubuntu",
-    "tags": "ansible,service,module,rhce"
+    "type": "button",
+    "hint": $hint,
+    "instructions": $instructions,
+    "text": "Check",
+    "tags": "ansible,lineinfile,ntp,service,timesyncd,rhce"
   }'

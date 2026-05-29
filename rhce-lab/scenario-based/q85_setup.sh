@@ -3,84 +3,68 @@ if [[ "$1" == "debug" ]]; then set -eoux; shift; fi
 lang="${1:-en}"
 
 inventory="/home/ansible_user/workspace/inventory"
-pb_path="/home/ansible_user/workspace/ssh_hardening.yml"
+pb_path="/home/ansible_user/workspace/ssh_banner.yml"
+banner_file="/home/ansible_user/workspace/motd_banner.txt"
 
-# Skip-q60 guard
-if [ ! -f "$inventory" ]; then
-  mkdir -p /home/ansible_user/workspace
-  printf '[webservers]\nweb1\nweb2\n\n[dbservers]\nbd1\n\n[all:vars]\nansible_user=ansible_user\n' > "$inventory"
-fi
-for entry in "10.30.0.11 web1" "10.30.0.12 web2" "10.30.0.13 bd1"; do
-  grep -qF "${entry%% *}" /etc/hosts 2>/dev/null || printf '%s\n' "$entry" | sudo tee -a /etc/hosts >/dev/null 2>&1 || true
-done
-if [ ! -f "/home/ansible_user/.ssh/id_rsa" ]; then
-  ssh-keygen -t rsa -b 2048 -f /home/ansible_user/.ssh/id_rsa -N "" >/dev/null 2>&1
-  for _h in web1 web2 bd1; do
-    SSHPASS='Labby123' sshpass -e ssh-copy-id -o StrictHostKeyChecking=no \
-      -i /home/ansible_user/.ssh/id_rsa.pub ansible_user@"$_h" >/dev/null 2>&1 || true
-  done
-fi
-
-# Clean state: restore permissive SSH defaults on webservers
-ansible webservers -i "$inventory" -m lineinfile \
-  -a "path=/etc/ssh/sshd_config regexp='^PermitRootLogin' line='PermitRootLogin yes'" \
+# Clean state: remove banner from webservers
+ansible webservers -i "$inventory" -m file \
+  -a "path=/etc/ssh/banner state=absent" \
   --become -o >/dev/null 2>&1 || true
 ansible webservers -i "$inventory" -m lineinfile \
-  -a "path=/etc/ssh/sshd_config regexp='^PasswordAuthentication' line='PasswordAuthentication yes'" \
-  --become -o >/dev/null 2>&1 || true
-ansible webservers -i "$inventory" -m lineinfile \
-  -a "path=/etc/ssh/sshd_config regexp='^ClientAliveInterval' state=absent" \
+  -a "path=/etc/ssh/sshd_config regexp='^Banner' state=absent" \
   --become -o >/dev/null 2>&1 || true
 ansible webservers -i "$inventory" -m service \
   -a "name=ssh state=restarted" \
   --become -o >/dev/null 2>&1 || true
 rm -f "$pb_path"
 
+# Ensure the banner source file exists on the control node
+if [ ! -f "$banner_file" ]; then
+  printf 'WARNING: Authorized access only. All activity is monitored and logged.\n' > "$banner_file"
+fi
+
 cmd1='```yaml
 ---
-- name: harden SSH configuration on webservers
+- name: deploy SSH login banner on webservers
   hosts: webservers
   become: yes
   tasks:
-    - name: disable root login
-      ansible.builtin.lineinfile:
-        path: /etc/ssh/sshd_config
-        regexp: "^PermitRootLogin"
-        line: "PermitRootLogin no"
-        backup: yes
+    - name: copy banner file
+      ansible.builtin.copy:
+        src: /home/ansible_user/workspace/motd_banner.txt
+        dest: /etc/ssh/banner
+        owner: root
+        group: root
+        mode: "0644"
 
-    - name: disable password authentication
+    - name: set Banner directive in sshd_config
       ansible.builtin.lineinfile:
         path: /etc/ssh/sshd_config
-        regexp: "^PasswordAuthentication"
-        line: "PasswordAuthentication no"
-
-    - name: set client alive interval
-      ansible.builtin.lineinfile:
-        path: /etc/ssh/sshd_config
-        regexp: "^ClientAliveInterval"
-        line: "ClientAliveInterval 300"
+        regexp: "^Banner"
+        line: "Banner /etc/ssh/banner"
 
     - name: restart sshd
       ansible.builtin.service:
         name: ssh
         state: restarted
 ```'
-cmd2="ansible-playbook -i $inventory $pb_path
-ansible webservers -i $inventory -m command -a 'sshd -T | grep -E \"permitrootlogin|passwordauthentication|clientaliveinterval\"' --become"
+cmd2="\`\`\`shell
+ansible-playbook -i $inventory $pb_path
+ansible webservers -i $inventory -m command -a 'cat /etc/ssh/banner' --become
+\`\`\`"
 
 case "$lang" in
   en)
-    question="The security team requires SSH hardening on all \`webservers\`. Write a playbook at \`$pb_path\` that sets: \`PermitRootLogin no\`, \`PasswordAuthentication no\`, and \`ClientAliveInterval 300\` in \`/etc/ssh/sshd_config\`, then restarts the SSH service. Use the \`lineinfile\` module."
-    hint="Use ansible.builtin.lineinfile with regexp to match existing directives and line to set the new value. Use backup: yes on the first task to preserve the original config. After all lineinfile tasks, add a service task to restart ssh. Verify with: sshd -T | grep -E 'permitrootlogin|passwordauthentication|clientaliveinterval'"
-    inst1="Write the playbook — use <span class=\"bold-green-text\">lineinfile</span> for each SSH directive, then restart the service:"
-    inst2="Run the playbook and verify the SSH configuration on all webservers:"
+    question="Legal requires a **warning banner** displayed to users on **SSH login** for all \`webservers\`. A banner file already exists at \`$banner_file\` on the control node. Write a playbook at \`$pb_path\` that copies this file to \`/etc/ssh/banner\` on each webserver, sets the \`Banner\` directive in \`/etc/ssh/sshd_config\`, and **restarts SSH**."
+    hint="Use ansible.builtin.copy to deploy the banner file, then ansible.builtin.lineinfile to set 'Banner /etc/ssh/banner' in sshd_config. Finally restart the ssh service. Verify with: ansible webservers -m command -a 'cat /etc/ssh/banner' --become"
+    inst1="Write the playbook at \`$pb_path\` — copy the banner, configure the \`Banner\` directive, then restart SSH:"
+    inst2="Run the playbook and verify the banner is deployed on all webservers:"
     ;;
   fr)
-    question="L'équipe sécurité exige le durcissement de SSH sur tous les \`webservers\`. Écrivez un playbook à \`$pb_path\` qui définit : \`PermitRootLogin no\`, \`PasswordAuthentication no\`, et \`ClientAliveInterval 300\` dans \`/etc/ssh/sshd_config\`, puis redémarre le service SSH. Utilisez le module \`lineinfile\`."
-    hint="Utilisez ansible.builtin.lineinfile avec regexp pour correspondre aux directives existantes et line pour définir la nouvelle valeur. Utilisez backup: yes sur la première tâche pour préserver la config d'origine. Après toutes les tâches lineinfile, ajoutez une tâche service pour redémarrer ssh. Vérifiez avec : sshd -T | grep -E 'permitrootlogin|passwordauthentication|clientaliveinterval'"
-    inst1="Écrivez le playbook — utilisez <span class=\"bold-green-text\">lineinfile</span> pour chaque directive SSH, puis redémarrez le service :"
-    inst2="Exécutez le playbook et vérifiez la configuration SSH sur tous les webservers :"
+    question="La direction juridique exige qu'une **bannière d'avertissement** soit affichée lors de la **connexion SSH** sur tous les \`webservers\`. Un fichier de bannière existe déjà à \`$banner_file\` sur le nœud de contrôle. Écrivez un playbook à \`$pb_path\` qui copie ce fichier vers \`/etc/ssh/banner\` sur chaque webserver, définit la directive \`Banner\` dans \`/etc/ssh/sshd_config\`, et **redémarre SSH**."
+    hint="Utilisez ansible.builtin.copy pour déployer le fichier de bannière, puis ansible.builtin.lineinfile pour définir 'Banner /etc/ssh/banner' dans sshd_config. Ensuite redémarrez le service ssh. Vérifiez avec : ansible webservers -m command -a 'cat /etc/ssh/banner' --become"
+    inst1="Écrivez le playbook à \`$pb_path\` — copiez la bannière, configurez la directive \`Banner\`, puis redémarrez SSH :"
+    inst2="Exécutez le playbook et vérifiez que la bannière est déployée sur tous les webservers :"
     ;;
   *)
     echo "Error: Unsupported language '$lang'. Use en or fr." >&2; exit 1 ;;
@@ -101,5 +85,5 @@ jq -n --indent 4 \
     "hint": $hint,
     "instructions": $instructions,
     "text": "Check",
-    "tags": "ansible,lineinfile,ssh,hardening,service,rhce"
+    "tags": "ansible,copy,lineinfile,ssh,banner,service,rhce"
   }'

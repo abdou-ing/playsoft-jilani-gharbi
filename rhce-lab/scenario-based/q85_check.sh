@@ -10,24 +10,22 @@ fi
 lang="en"
 if [[ "$1" == "fr" ]]; then lang="$1"; shift; fi
 
-pb_path="/home/ansible_user/workspace/ssh_hardening.yml"
+pb_path="/home/ansible_user/workspace/ssh_banner.yml"
 inventory="/home/ansible_user/workspace/inventory"
 
 declare -A messages_en=(
   ["no_file"]="Playbook not found at $pb_path. Create it first."
-  ["no_lineinfile"]="The playbook does not use lineinfile. Use ansible.builtin.lineinfile to modify /etc/ssh/sshd_config."
-  ["no_service"]="The playbook does not restart the SSH service. Add a service task: name: ssh, state: restarted."
-  ["wrong_root"]="PermitRootLogin is not set to 'no' on web1. Run the playbook: ansible-playbook -i $inventory $pb_path"
-  ["wrong_passwd"]="PasswordAuthentication is not set to 'no' on web1. Ensure your lineinfile task sets 'PasswordAuthentication no'."
-  ["wrong_alive"]="ClientAliveInterval is not set to 300 on web1. Ensure your lineinfile task sets 'ClientAliveInterval 300'."
+  ["no_copy"]="The playbook does not use the 'copy' module. Use ansible.builtin.copy to deploy the banner file to /etc/ssh/banner."
+  ["no_lineinfile"]="The playbook does not use lineinfile. Use ansible.builtin.lineinfile to set 'Banner /etc/ssh/banner' in sshd_config."
+  ["no_banner_file"]="/etc/ssh/banner does not exist on web1. Run the playbook: ansible-playbook -i $inventory $pb_path"
+  ["no_directive"]="The Banner directive is not set in /etc/ssh/sshd_config on web1. Ensure your lineinfile task sets 'Banner /etc/ssh/banner'."
 )
 declare -A messages_fr=(
   ["no_file"]="Playbook introuvable à $pb_path. Créez-le d'abord."
-  ["no_lineinfile"]="Le playbook n'utilise pas lineinfile. Utilisez ansible.builtin.lineinfile pour modifier /etc/ssh/sshd_config."
-  ["no_service"]="Le playbook ne redémarre pas le service SSH. Ajoutez une tâche service : name: ssh, state: restarted."
-  ["wrong_root"]="PermitRootLogin n'est pas défini à 'no' sur web1. Exécutez le playbook : ansible-playbook -i $inventory $pb_path"
-  ["wrong_passwd"]="PasswordAuthentication n'est pas défini à 'no' sur web1. Assurez-vous que votre tâche lineinfile définit 'PasswordAuthentication no'."
-  ["wrong_alive"]="ClientAliveInterval n'est pas défini à 300 sur web1. Assurez-vous que votre tâche lineinfile définit 'ClientAliveInterval 300'."
+  ["no_copy"]="Le playbook n'utilise pas le module 'copy'. Utilisez ansible.builtin.copy pour déployer le fichier de bannière vers /etc/ssh/banner."
+  ["no_lineinfile"]="Le playbook n'utilise pas lineinfile. Utilisez ansible.builtin.lineinfile pour définir 'Banner /etc/ssh/banner' dans sshd_config."
+  ["no_banner_file"]="/etc/ssh/banner n'existe pas sur web1. Exécutez le playbook : ansible-playbook -i $inventory $pb_path"
+  ["no_directive"]="La directive Banner n'est pas définie dans /etc/ssh/sshd_config sur web1. Assurez-vous que votre tâche lineinfile définit 'Banner /etc/ssh/banner'."
 )
 
 get_message() { declare -n _m="messages_$lang"; echo "{\"result\": \"${_m[$1]}\"}"; }
@@ -36,26 +34,22 @@ if [ ! -f "$pb_path" ]; then
   echo "$(get_message no_file)"; exit 0
 fi
 
+if ! grep -q "copy:" "$pb_path" && ! grep -q "ansible.builtin.copy" "$pb_path"; then
+  echo "$(get_message no_copy)"; exit 0
+fi
+
 if ! grep -q "lineinfile" "$pb_path"; then
   echo "$(get_message no_lineinfile)"; exit 0
 fi
 
-if ! grep -q "restarted" "$pb_path"; then
-  echo "$(get_message no_service)"; exit 0
+stat_result=$(ansible web1 -i "$inventory" -m stat -a "path=/etc/ssh/banner" --become 2>/dev/null)
+if ! echo "$stat_result" | grep -q '"exists": true'; then
+  echo "$(get_message no_banner_file)"; exit 0
 fi
 
 sshd_output=$(ansible web1 -i "$inventory" -m command -a "sshd -T" --become 2>/dev/null)
-
-if ! echo "$sshd_output" | grep -qi "permitrootlogin no"; then
-  echo "$(get_message wrong_root)"; exit 0
-fi
-
-if ! echo "$sshd_output" | grep -qi "passwordauthentication no"; then
-  echo "$(get_message wrong_passwd)"; exit 0
-fi
-
-if ! echo "$sshd_output" | grep -qi "clientaliveinterval 300"; then
-  echo "$(get_message wrong_alive)"; exit 0
+if ! echo "$sshd_output" | grep -qi "banner /etc/ssh/banner"; then
+  echo "$(get_message no_directive)"; exit 0
 fi
 
 echo '{"result": "0"}'

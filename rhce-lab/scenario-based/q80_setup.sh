@@ -5,22 +5,6 @@ lang="${1:-en}"
 inventory="/home/ansible_user/workspace/inventory"
 pb_path="/home/ansible_user/workspace/sudo_access.yml"
 
-# Skip-q60 guard
-if [ ! -f "$inventory" ]; then
-  mkdir -p /home/ansible_user/workspace
-  printf '[webservers]\nweb1\nweb2\n\n[dbservers]\nbd1\n\n[all:vars]\nansible_user=ansible_user\n' > "$inventory"
-fi
-for entry in "10.30.0.11 web1" "10.30.0.12 web2" "10.30.0.13 bd1"; do
-  grep -qF "${entry%% *}" /etc/hosts 2>/dev/null || printf '%s\n' "$entry" | sudo tee -a /etc/hosts >/dev/null 2>&1 || true
-done
-if [ ! -f "/home/ansible_user/.ssh/id_rsa" ]; then
-  ssh-keygen -t rsa -b 2048 -f /home/ansible_user/.ssh/id_rsa -N "" >/dev/null 2>&1
-  for _h in web1 web2 bd1; do
-    SSHPASS='Labby123' sshpass -e ssh-copy-id -o StrictHostKeyChecking=no \
-      -i /home/ansible_user/.ssh/id_rsa.pub ansible_user@"$_h" >/dev/null 2>&1 || true
-  done
-fi
-
 # Skip-q78 guard: ensure john exists
 ansible webservers -i "$inventory" -m user \
   -a "name=john create_home=yes shell=/bin/bash state=present" \
@@ -47,20 +31,22 @@ cmd1='```yaml
         mode: "0440"
         validate: /usr/sbin/visudo -cf %s
 ```'
-cmd2="ansible-playbook -i $inventory $pb_path
-ansible webservers -i $inventory -m command -a 'sudo -l -U john' --become"
+cmd2="\`\`\`shell
+ansible-playbook -i $inventory $pb_path
+ansible webservers -i $inventory -m command -a 'sudo -l -U john' --become
+\`\`\`"
 
 case "$lang" in
   en)
-    question="John cannot run administrative tasks yet. Write a playbook at \`$pb_path\` that grants him full sudo access on all \`webservers\` by deploying a sudoers drop-in file at \`/etc/sudoers.d/john\`. The file must be validated with visudo before being applied — never copy an unvalidated sudoers file. Run the playbook."
+    question="John cannot run administrative tasks yet. Write a playbook at \`$pb_path\` that grants him **full sudo access** on all \`webservers\` by deploying a sudoers drop-in file at \`/etc/sudoers.d/john\`. The file must be **validated with visudo** before being applied — **never copy an unvalidated sudoers file**. Run the playbook."
     hint="Use ansible.builtin.copy with: content: 'john ALL=(ALL) NOPASSWD:ALL\n', dest: /etc/sudoers.d/john, mode: '0440', validate: /usr/sbin/visudo -cf %s. The validate parameter runs visudo on the temp file before writing — this prevents syntax errors from breaking sudo."
-    inst1="Write the playbook using <span class=\"bold-green-text\">ansible.builtin.copy</span> with the <span class=\"bold-green-text\">validate</span> parameter to safely deploy the sudoers drop-in file:"
+    inst1="Write the playbook at \`$pb_path\` using \`ansible.builtin.copy\` with the \`validate\` parameter to safely deploy the sudoers drop-in file:"
     inst2="Run the playbook and verify john has sudo access on all webservers:"
     ;;
   fr)
-    question="John ne peut pas encore exécuter des tâches administratives. Écrivez un playbook à \`$pb_path\` qui lui accorde l'accès sudo complet sur tous les \`webservers\` en déployant un fichier sudoers drop-in à \`/etc/sudoers.d/john\`. Le fichier doit être validé avec visudo avant d'être appliqué. Exécutez le playbook."
+    question="John ne peut pas encore exécuter des tâches administratives. Écrivez un playbook à \`$pb_path\` qui lui accorde **l'accès sudo complet** sur tous les \`webservers\` en déployant un fichier sudoers drop-in à \`/etc/sudoers.d/john\`. Le fichier doit être **validé avec visudo** avant d'être appliqué. Exécutez le playbook."
     hint="Utilisez ansible.builtin.copy avec : content: 'john ALL=(ALL) NOPASSWD:ALL\n', dest: /etc/sudoers.d/john, mode: '0440', validate: /usr/sbin/visudo -cf %s. Le paramètre validate exécute visudo sur le fichier temporaire avant l'écriture — cela évite les erreurs de syntaxe qui casseraient sudo."
-    inst1="Écrivez le playbook avec <span class=\"bold-green-text\">ansible.builtin.copy</span> et le paramètre <span class=\"bold-green-text\">validate</span> pour déployer le fichier sudoers drop-in en toute sécurité :"
+    inst1="Écrivez le playbook à \`$pb_path\` avec \`ansible.builtin.copy\` et le paramètre \`validate\` pour déployer le fichier sudoers drop-in en toute sécurité :"
     inst2="Exécutez le playbook et vérifiez que john dispose de l'accès sudo sur tous les webservers :"
     ;;
   *)
