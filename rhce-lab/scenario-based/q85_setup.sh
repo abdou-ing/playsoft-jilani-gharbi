@@ -20,7 +20,7 @@ rm -f "$pb_path"
 
 # Ensure the banner source file exists on the control node
 if [ ! -f "$banner_file" ]; then
-  printf 'WARNING: Authorized access only. All activity is monitored and logged.\n' > "$banner_file"
+  { printf 'WARNING: Authorized access only. All activity is monitored and logged.\n' > "$banner_file"; } 2>/dev/null || true
 fi
 
 cmd1='```yaml
