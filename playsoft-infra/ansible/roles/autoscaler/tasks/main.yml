@@ -1,0 +1,144 @@
+---
+- name: Assert HCLOUD_TOKEN is exported on control node
+  assert:
+    that: lookup('env', 'HCLOUD_TOKEN') | length > 0
+    fail_msg: "HCLOUD_TOKEN env var is not set — export it before running this playbook"
+
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+
+- name: Remove conflicting HashiCorp apt source file
+  file:
+    path: /etc/apt/sources.list.d/hashicorp.list
+    state: absent
+
+- name: Download HashiCorp GPG key
+  get_url:
+    url: https://apt.releases.hashicorp.com/gpg
+    dest: /usr/share/keyrings/hashicorp.gpg
+    mode: "0644"
+
+- name: Add HashiCorp apt repo
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
+    state: present
+    filename: hashicorp
+
+- name: Install apt packages
+  apt:
+    name:
+      - python3
+      - prometheus
+      - ansible
+      - terraform
+    state: present
+    update_cache: true
+
+- name: Download Alertmanager binary
+  unarchive:
+    src: https://github.com/prometheus/alertmanager/releases/download/v0.32.1/alertmanager-0.32.1.linux-amd64.tar.gz
+    dest: /tmp
+    remote_src: true
+    creates: /tmp/alertmanager-0.32.1.linux-amd64/alertmanager
+
+- name: Install alertmanager binary to /usr/local/bin
+  copy:
+    src: /tmp/alertmanager-0.32.1.linux-amd64/alertmanager
+    dest: /usr/local/bin/alertmanager
+    mode: "0755"
+    remote_src: true
+
+- name: Create alertmanager storage dir
+  file:
+    path: /var/lib/alertmanager
+    state: directory
+    mode: "0755"
+
+# ── Project files ──────────────────────────────────────────────────────────────
+
+- name: Create /opt/infra/prometheus directory tree
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /opt/infra/prometheus
+    - /opt/infra/prometheus/webhook
+    - /opt/infra/prometheus/config
+    - /opt/infra/prometheus/ansible
+    - /opt/infra/prometheus/terraform
+
+- name: Copy webhook script
+  copy:
+    src: "{{ playbook_dir }}/../prometheus/webhook/webhook.py"
+    dest: /opt/infra/prometheus/webhook/webhook.py
+    mode: "0755"
+
+- name: Copy Prometheus config files
+  copy:
+    src: "{{ playbook_dir }}/../prometheus/config/{{ item }}"
+    dest: "/opt/infra/prometheus/config/{{ item }}"
+  loop:
+    - prometheus.yml
+    - alerts.yml
+
+- name: Template alertmanager config
+  template:
+    src: alertmanager.yml.j2
+    dest: /opt/infra/prometheus/config/alertmanager.yml
+    mode: "0644"
+
+- name: Copy Ansible join-worker playbook
+  copy:
+    src: "{{ playbook_dir }}/../prometheus/ansible/join-worker.yml"
+    dest: /opt/infra/prometheus/ansible/join-worker.yml
+
+- name: Sync Terraform files to bastion
+  synchronize:
+    src: "{{ playbook_dir }}/../prometheus/terraform/"
+    dest: /opt/infra/prometheus/terraform/
+    rsync_opts:
+      - "--exclude=.terraform"
+      - "--exclude=.terraform.lock.hcl"
+
+- name: Run terraform init
+  command: terraform init -upgrade
+  args:
+    chdir: /opt/infra/prometheus/terraform
+  environment:
+    HCLOUD_TOKEN: "{{ lookup('env', 'HCLOUD_TOKEN') }}"
+
+- name: Create prometheus systemd override dir
+  file:
+    path: /etc/systemd/system/prometheus.service.d
+    state: directory
+    mode: "0755"
+
+- name: Override prometheus to read config from /opt/infra
+  copy:
+    dest: /etc/systemd/system/prometheus.service.d/override.conf
+    mode: "0644"
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/prometheus \
+        --config.file=/opt/infra/prometheus/config/prometheus.yml \
+        --storage.tsdb.path=/var/lib/prometheus/data \
+        --web.console.libraries=/usr/share/prometheus/console_libraries \
+        --web.console.templates=/usr/share/prometheus/consoles
+  notify: reload prometheus
+
+# ── Systemd units ──────────────────────────────────────────────────────────────
+
+- name: Install autoscaler systemd unit (token injected from env)
+  template:
+    src: autoscaler.service.j2
+    dest: /etc/systemd/system/autoscaler.service
+    mode: "0644"
+  notify: reload systemd and restart autoscaler
+
+- name: Install alertmanager systemd unit
+  copy:
+    src: "{{ playbook_dir }}/../prometheus/systemd/alertmanager.service"
+    dest: /etc/systemd/system/alertmanager.service
+    mode: "0644"
+  notify: reload systemd and restart alertmanager

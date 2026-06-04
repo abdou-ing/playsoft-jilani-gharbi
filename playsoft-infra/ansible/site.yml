@@ -11,6 +11,16 @@
         bastion_ip: "{{ (lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json') | from_json).bastion_public_ip.value }}"
 
 # ---------------------------------------------------------------------------
+# 1. Bastion: Deploy autoscaler pipeline
+# ---------------------------------------------------------------------------
+- name: Configure Bastion (autoscaler)
+  hosts: bastion
+  become: true
+  tags: [autoscaler]
+  roles:
+    - autoscaler
+
+# ---------------------------------------------------------------------------
 # 0. Kubernetes Cluster Setup
 # ---------------------------------------------------------------------------
 - name: Configure Kubernetes nodes (common)

@@ -1,0 +1,12 @@
+[Unit]
+Description=K8s Autoscaler Webhook
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/infra/prometheus/webhook/webhook.py
+Restart=always
+User=root
+Environment=HCLOUD_TOKEN={{ lookup('env', 'HCLOUD_TOKEN') }}
+
+[Install]
+WantedBy=multi-user.target

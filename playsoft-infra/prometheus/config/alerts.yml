@@ -1,0 +1,69 @@
+groups:
+  - name: node.cpu
+    rules:
+      - alert: NodeCPUWarning
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 70
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU on {{ $labels.instance }}"
+
+      - alert: NodeCPUCritical
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 85
+        for: 2m
+        labels:
+          severity: critical
+          action: scale-out
+        annotations:
+          summary: "CPU saturation on {{ $labels.instance }} — scale-out triggered"
+
+  - name: node.availability
+    rules:
+      - alert: NodeDown
+        expr: up{job="k8s-nodes"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node {{ $labels.instance }} is unreachable"
+
+  - name: node.memory
+    rules:
+      - alert: NodeMemoryWarning
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory on {{ $labels.instance }}: {{ $value | printf \"%.1f\" }}% used"
+
+      - alert: NodeMemoryCritical
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Memory critical on {{ $labels.instance }}: {{ $value | printf \"%.1f\" }}% used"
+
+  - name: node.disk
+    rules:
+      - alert: NodeDiskWarning
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!="tmpfs",mountpoint="/"} / node_filesystem_size_bytes{fstype!="tmpfs",mountpoint="/"})) * 100 > 75
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk filling on {{ $labels.instance }}: {{ $value | printf \"%.1f\" }}% used"
+
+      - alert: NodeDiskCritical
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!="tmpfs",mountpoint="/"} / node_filesystem_size_bytes{fstype!="tmpfs",mountpoint="/"})) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk almost full on {{ $labels.instance }}: {{ $value | printf \"%.1f\" }}% used"

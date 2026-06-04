@@ -1,0 +1,42 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 15m
+  receiver: default
+  routes:
+    - matchers:
+        - severity = critical
+        - action = scale-out
+      receiver: autoscaler
+      repeat_interval: 15m
+
+receivers:
+  - name: default
+    email_configs:
+      - to: jilanigharbi88@gmail.com
+        from: gharbijilani001@gmail.com
+        smarthost: smtp.gmail.com:587
+        auth_username: gharbijilani001@gmail.com
+        auth_password: app_password_gmail
+        require_tls: true
+        send_resolved: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }} — {{ .CommonAnnotations.summary }}'
+        text: |
+          {{ range .Alerts }}
+          Alert:    {{ .Labels.alertname }}
+          Status:   {{ .Status | toUpper }}
+          Server:   {{ .Labels.instance }}
+          Severity: {{ .Labels.severity }}
+          Message:  {{ .Annotations.summary }}
+          Time:     {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+          {{ end }}
+
+  - name: autoscaler
+    webhook_configs:
+      - url: 'http://localhost:8080'
+        send_resolved: false

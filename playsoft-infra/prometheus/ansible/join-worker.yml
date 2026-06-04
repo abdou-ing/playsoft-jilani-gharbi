@@ -1,0 +1,50 @@
+---
+- name: Get join command from master
+  hosts: masters
+  become: true
+  tasks:
+    - name: Generate fresh join token
+      command: kubeadm token create --print-join-command
+      register: join_command
+
+    - name: Share join command with play
+      set_fact:
+        kube_join_command: "{{ join_command.stdout }}"
+
+- name: Configure and join new worker
+  hosts: new_workers
+  become: true
+  tasks:
+    - name: Install kubeadm kubelet kubectl
+      apt:
+        name: [kubeadm, kubelet, kubectl]
+        state: present
+        update_cache: yes
+
+    - name: Install node_exporter
+      apt:
+        name: prometheus-node-exporter
+        state: present
+
+    - name: Enable node_exporter
+      systemd:
+        name: prometheus-node-exporter
+        state: started
+        enabled: yes
+
+    - name: Join cluster
+      command: "{{ hostvars[groups['masters'][0]].kube_join_command }}"
+      args:
+        creates: /etc/kubernetes/kubelet.conf
+
+    - name: Wait for node to register with API server
+      delegate_to: "{{ groups['masters'][0] }}"
+      command: "kubectl get node {{ ansible_hostname }}"
+      register: node_ready
+      retries: 24
+      delay: 10
+      until: node_ready.rc == 0
+
+    - name: Label node as worker
+      delegate_to: "{{ groups['masters'][0] }}"
+      command: "kubectl label node {{ ansible_hostname }} node-role.kubernetes.io/worker=worker --overwrite"

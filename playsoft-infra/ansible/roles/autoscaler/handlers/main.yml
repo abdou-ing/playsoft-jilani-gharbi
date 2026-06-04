@@ -1,0 +1,21 @@
+---
+- name: reload systemd and restart autoscaler
+  systemd:
+    name: autoscaler
+    daemon_reload: true
+    state: restarted
+    enabled: true
+
+- name: reload systemd and restart alertmanager
+  systemd:
+    name: alertmanager
+    daemon_reload: true
+    state: restarted
+    enabled: true
+
+- name: reload prometheus
+  systemd:
+    name: prometheus
+    daemon_reload: true
+    state: restarted
+    enabled: true

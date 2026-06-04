@@ -5,3 +5,15 @@
     name: containerd
     state: started
     enabled: yes
+
+- name: Install node_exporter
+  apt:
+    name: prometheus-node-exporter
+    state: present
+    update_cache: yes
+
+- name: Enable node_exporter
+  systemd:
+    name: prometheus-node-exporter
+    state: started
+    enabled: yes
