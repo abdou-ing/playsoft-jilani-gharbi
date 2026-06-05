@@ -13,7 +13,7 @@ TF_DIR         = "/opt/infra/prometheus/terraform"
 TF_VARS        = "env/dev.tfvars"
 ANSIBLE_DIR    = "/opt/infra/prometheus/ansible"
 JOIN_PLAYBOOK  = f"{ANSIBLE_DIR}/join-worker.yml"
-PROMETHEUS_CFG = "/opt/infra/prometheus/config/prometheus.yml"
+PROMETHEUS_CFG = "/opt/infra/prometheus/config/targets.json"
 SSH_KEY        = "/root/.ssh/jilani"
 MASTER_IP      = "10.20.0.10"
 WORKER_BASE_IP = 11
@@ -25,19 +25,32 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         global last_scale
         length = int(self.headers.get("Content-Length", 0))
-        body = json.loads(self.rfile.read(length))
+        if length == 0:
+            self.send_response(400)
+            self.end_headers()
+            return
+        try:
+            body = json.loads(self.rfile.read(length))
+        except json.JSONDecodeError:
+            self.send_response(400)
+            self.end_headers()
+            return
 
         for alert in body.get("alerts", []):
             is_firing    = alert["status"] == "firing"
-            is_scale_out = alert["labels"].get("action") == "scale-out"
+            action       = alert["labels"].get("action")
             cooled_down  = time.time() - last_scale > COOLDOWN
 
-            if is_firing and is_scale_out and cooled_down:
+            if is_firing and action == "scale-out" and cooled_down:
                 instance = alert["labels"].get("instance", "unknown")
                 logging.info("Scale-out triggered by %s", instance)
                 if scale_out():
                     last_scale = time.time()
-            elif is_firing and is_scale_out and not cooled_down:
+            elif is_firing and action == "scale-in" and cooled_down:
+                logging.info("Scale-in triggered — cluster CPU low")
+                if scale_in():
+                    last_scale = time.time()
+            elif is_firing and not cooled_down:
                 remaining = int(COOLDOWN - (time.time() - last_scale))
                 logging.info("Cooldown active — %ds remaining", remaining)
 
@@ -148,32 +161,63 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/
     return True
 
 
+def scale_in():
+    current = get_current_worker_count()
+    if current is None:
+        return False
+    if current <= 1:
+        logging.info("Scale-in skipped — already at minimum (1 worker)")
+        return False
+
+    new_count  = current - 1
+    remove_ip  = f"10.20.0.{WORKER_BASE_IP + current - 1}"
+    hostname   = f"hzn-k8s-worker-{current}-jilani"
+    logging.info("Scaling %d → %d workers, removing %s (%s)", current, new_count, hostname, remove_ip)
+
+    ssh = ["ssh", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no",
+           "-o", "ConnectTimeout=10", f"root@{MASTER_IP}"]
+
+    # Step 1: drain the node
+    r = subprocess.run(
+        ssh + [f"kubectl drain {hostname} --ignore-daemonsets --delete-emptydir-data --force"],
+        capture_output=True, text=True
+    )
+    logging.info("kubectl drain: %s", r.stdout[-400:])
+    if r.returncode != 0:
+        logging.error("kubectl drain failed: %s", r.stderr)
+        return False
+
+    # Step 2: delete node from cluster
+    subprocess.run(
+        ssh + [f"kubectl delete node {hostname}"],
+        capture_output=True, text=True
+    )
+
+    # Step 3: terraform apply with reduced count
+    r = subprocess.run(
+        ["terraform", f"-chdir={TF_DIR}", "apply", "-auto-approve",
+         f"-var-file={TF_VARS}", f"-var=worker_count={new_count}"],
+        capture_output=True, text=True
+    )
+    logging.info("Terraform stdout: %s", r.stdout[-800:])
+    if r.returncode != 0:
+        logging.error("Terraform scale-in failed: %s", r.stderr)
+        return False
+
+    # Step 4: update prometheus targets
+    update_prometheus(new_count)
+    logging.info("Scale-in complete — %d worker(s) remaining", new_count)
+    return True
+
+
 def update_prometheus(worker_count):
-    targets = [f"      - {MASTER_IP}:9100"]
+    targets = [f"{MASTER_IP}:9100"]
     for i in range(worker_count):
-        targets.append(f"      - 10.20.0.{WORKER_BASE_IP + i}:9100")
+        targets.append(f"10.20.0.{WORKER_BASE_IP + i}:9100")
 
-    config = f"""global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
-
-rule_files:
-  - /opt/infra/prometheus/config/alerts.yml
-
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets: ['localhost:9093']
-
-scrape_configs:
-  - job_name: k8s-nodes
-    static_configs:
-      - targets:
-{chr(10).join(targets)}
-"""
-    Path(PROMETHEUS_CFG).write_text(config)
-    subprocess.run(["systemctl", "reload", "prometheus"])
-    logging.info("Prometheus updated — scraping %d worker(s)", worker_count)
+    targets_json = json.dumps([{"targets": targets, "labels": {"job": "k8s-nodes"}}], indent=2)
+    Path(PROMETHEUS_CFG).write_text(targets_json)
+    logging.info("Prometheus targets updated — scraping %d worker(s)", worker_count)
 
 
 if __name__ == "__main__":

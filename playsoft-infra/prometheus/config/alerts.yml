@@ -18,6 +18,18 @@ groups:
         annotations:
           summary: "CPU saturation on {{ $labels.instance }} — scale-out triggered"
 
+  - name: node.scaledown
+    rules:
+      - alert: NodeCPULow
+        expr: |
+          avg(100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle",job="k8s-nodes"}[5m])) * 100)) < 20
+        for: 10m
+        labels:
+          severity: info
+          action: scale-in
+        annotations:
+          summary: "Cluster CPU low ({{ $value | printf \"%.1f\" }}%) — scale-in triggered"
+
   - name: node.availability
     rules:
       - alert: NodeDown

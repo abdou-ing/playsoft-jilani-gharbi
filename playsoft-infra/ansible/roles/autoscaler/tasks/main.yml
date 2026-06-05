@@ -127,6 +127,20 @@
         --web.console.templates=/usr/share/prometheus/consoles
   notify: reload prometheus
 
+- name: Read Terraform state to get current node IPs
+  command: terraform output -json worker_private_ips
+  args:
+    chdir: /opt/infra/prometheus/terraform
+  register: tf_worker_ips
+  changed_when: false
+  environment:
+    HCLOUD_TOKEN: "{{ lookup('env', 'HCLOUD_TOKEN') }}"
+
+- name: Generate initial targets.json from Terraform state
+  copy:
+    dest: /opt/infra/prometheus/config/targets.json
+    content: "{{ [{'targets': ['10.20.0.10:9100'] + (tf_worker_ips.stdout | from_json | map('regex_replace', '$', ':9100') | list), 'labels': {'job': 'k8s-nodes'}}] | to_nice_json }}"
+
 # ── Systemd units ──────────────────────────────────────────────────────────────
 
 - name: Install autoscaler systemd unit (token injected from env)
@@ -142,3 +156,24 @@
     dest: /etc/systemd/system/alertmanager.service
     mode: "0644"
   notify: reload systemd and restart alertmanager
+
+# ── Ensure all services are running ───────────────────────────────────────────
+
+- name: Ensure prometheus is running
+  systemd:
+    name: prometheus
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Ensure alertmanager is running
+  systemd:
+    name: alertmanager
+    state: started
+    enabled: true
+
+- name: Ensure autoscaler is running
+  systemd:
+    name: autoscaler
+    state: started
+    enabled: true

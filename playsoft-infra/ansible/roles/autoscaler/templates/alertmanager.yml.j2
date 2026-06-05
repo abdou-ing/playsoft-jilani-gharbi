@@ -14,6 +14,11 @@ route:
       receiver: autoscaler
       repeat_interval: 15m
 
+    - matchers:
+        - action = scale-in
+      receiver: autoscaler
+      repeat_interval: 20m
+
 receivers:
   - name: default
     email_configs:

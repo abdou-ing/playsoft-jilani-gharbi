@@ -12,8 +12,7 @@ alerting:
 
 scrape_configs:
   - job_name: k8s-nodes
-    static_configs:
-      - targets:
-          - 10.20.0.10:9100
-          - 10.20.0.11:9100
-          - 10.20.0.12:9100
+    file_sd_configs:
+      - files:
+          - /opt/infra/prometheus/config/targets.json
+        refresh_interval: 30s
