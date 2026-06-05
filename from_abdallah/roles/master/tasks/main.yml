@@ -1,14 +1,14 @@
 # ── Check cluster state on each node ─────────────────────────────────────────
 
 - name: Check if node is already part of the cluster
-  stat:
+  ansible.builtin.stat:
     path: /etc/kubernetes/admin.conf
   register: k8s_initialized
 
 # ── First master: init ────────────────────────────────────────────────────────
 
 - name: Deploy kubeadm config
-  template:
+  ansible.builtin.template:
     src: kubeadm-config.yaml.j2
     dest: /etc/kubernetes/kubeadm-config.yaml
     mode: '0644'
@@ -17,13 +17,13 @@
     - not k8s_initialized.stat.exists
 
 - name: Initialize Kubernetes
-  command: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml
+  ansible.builtin.command: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml
   when:
     - inventory_hostname == groups['k8s_master_servers'][0]
     - not k8s_initialized.stat.exists
 
 - name: Create kube dir
-  file:
+  ansible.builtin.file:
     path: /root/.kube
     state: directory
   when:
@@ -31,7 +31,7 @@
     - not k8s_initialized.stat.exists
 
 - name: Copy admin.conf
-  copy:
+  ansible.builtin.copy:
     src: /etc/kubernetes/admin.conf
     dest: /root/.kube/config
     remote_src: yes
@@ -40,21 +40,21 @@
     - not k8s_initialized.stat.exists
 
 - name: Upload control-plane certs and capture certificate key
-  command: kubeadm init phase upload-certs --upload-certs
+  ansible.builtin.command: kubeadm init phase upload-certs --upload-certs
   register: upload_certs_output
   when:
     - inventory_hostname == groups['k8s_master_servers'][0]
     - not k8s_initialized.stat.exists
 
 - name: Generate join command
-  command: kubeadm token create --print-join-command
+  ansible.builtin.command: kubeadm token create --print-join-command
   register: join_command
   when:
     - inventory_hostname == groups['k8s_master_servers'][0]
     - not k8s_initialized.stat.exists
 
 - name: Share join commands with all hosts
-  set_fact:
+  ansible.builtin.set_fact:
     kube_join_command: "{{ join_command.stdout }}"
     kube_control_plane_join_command: >-
       {{ join_command.stdout }}
@@ -65,7 +65,7 @@
     - not k8s_initialized.stat.exists
 
 - name: Install Calico
-  command: kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+  ansible.builtin.command: kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
   when:
@@ -73,7 +73,7 @@
     - not k8s_initialized.stat.exists
 
 - name: Copy files
-  copy:
+  ansible.builtin.copy:
     src: "{{ item }}"
     dest: /opt/guacamole_manifest/
     mode: '0644'
@@ -86,13 +86,13 @@
 # ── Additional masters: join as control-plane ─────────────────────────────────
 
 - name: Join additional masters as control-plane nodes
-  command: "{{ hostvars[groups['k8s_master_servers'][0]]['kube_control_plane_join_command'] }}"
+  ansible.builtin.command: "{{ hostvars[groups['k8s_master_servers'][0]]['kube_control_plane_join_command'] }}"
   when:
     - inventory_hostname != groups['k8s_master_servers'][0]
     - not k8s_initialized.stat.exists
 
 - name: Create kube dir on additional masters
-  file:
+  ansible.builtin.file:
     path: /root/.kube
     state: directory
   when:
@@ -100,7 +100,7 @@
     - not k8s_initialized.stat.exists
 
 - name: Copy admin.conf on additional masters
-  copy:
+  ansible.builtin.copy:
     src: /etc/kubernetes/admin.conf
     dest: /root/.kube/config
     remote_src: yes
@@ -111,7 +111,7 @@
 # ── First master: wait and finalize ───────────────────────────────────────────
 
 - name: Wait for all nodes to be Ready
-  command: kubectl get nodes --no-headers
+  ansible.builtin.command: kubectl get nodes --no-headers
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
   register: nodes_status
@@ -123,7 +123,7 @@
     - not k8s_initialized.stat.exists
 
 - name: Wait for kube-system pods to be Running
-  command: kubectl get pods -n kube-system --no-headers
+  ansible.builtin.command: kubectl get pods -n kube-system --no-headers
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
   register: system_pods
@@ -135,7 +135,7 @@
     - not k8s_initialized.stat.exists
 
 - name: Apply all manifests
-  command: kubectl apply -f /opt/guacamole_manifest/
+  ansible.builtin.command: kubectl apply -f /opt/guacamole_manifest/
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
   when:
