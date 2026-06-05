@@ -1,0 +1,30 @@
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: "10.1.0.8"  # Replace with actual IP
+  bindPort: 6443
+nodeRegistration:
+  name: "hzn-master-1-prd"  # Replace with actual hostname
+  criSocket: "unix:///var/run/containerd/containerd.sock"
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+kubernetesVersion: v1.35.5
+controlPlaneEndpoint: "10.1.0.8:6443"  # Replace with LB IP or master1 IP
+networking:
+  podSubnet: "192.168.0.0/16"  # Default Calico subnet
+  serviceSubnet: "10.96.0.0/12"
+apiServer:
+  certSANs:
+  #- "LOAD_BALANCER_IP"  # Load balancer IP/DNS
+  - "10.1.0.8"
+  - "10.1.0.5"
+  #- "MASTER3_IP"
+  - "127.0.0.1"
+etcd:
+  local:
+    dataDir: "/var/lib/etcd"
+---
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+cgroupDriver: systemd
