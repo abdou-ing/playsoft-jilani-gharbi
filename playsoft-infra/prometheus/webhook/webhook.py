@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 import json
 import logging
+import os
 import subprocess
+import threading
 import time
+import urllib.request
+import urllib.error
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -177,7 +181,11 @@ def scale_in():
     ssh = ["ssh", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no",
            "-o", "ConnectTimeout=10", f"root@{MASTER_IP}"]
 
-    # Step 1: drain the node
+    # Step 1: remove from Prometheus BEFORE draining so NodeDown never fires
+    update_prometheus(new_count)
+    logging.info("Removed %s from Prometheus targets before drain", remove_ip)
+
+    # Step 2: drain the node
     r = subprocess.run(
         ssh + [f"kubectl drain {hostname} --ignore-daemonsets --delete-emptydir-data --force"],
         capture_output=True, text=True
@@ -185,15 +193,17 @@ def scale_in():
     logging.info("kubectl drain: %s", r.stdout[-400:])
     if r.returncode != 0:
         logging.error("kubectl drain failed: %s", r.stderr)
+        # Rollback: re-add the IP to prometheus since drain failed
+        update_prometheus(current)
         return False
 
-    # Step 2: delete node from cluster
+    # Step 3: delete node from cluster
     subprocess.run(
         ssh + [f"kubectl delete node {hostname}"],
         capture_output=True, text=True
     )
 
-    # Step 3: terraform apply with reduced count
+    # Step 4: terraform apply with reduced count
     r = subprocess.run(
         ["terraform", f"-chdir={TF_DIR}", "apply", "-auto-approve",
          f"-var-file={TF_VARS}", f"-var=worker_count={new_count}"],
@@ -204,22 +214,130 @@ def scale_in():
         logging.error("Terraform scale-in failed: %s", r.stderr)
         return False
 
-    # Step 4: update prometheus targets
-    update_prometheus(new_count)
     logging.info("Scale-in complete — %d worker(s) remaining", new_count)
     return True
 
 
 def update_prometheus(worker_count):
-    targets = [f"{MASTER_IP}:9100"]
+    entries = [{"targets": [f"{MASTER_IP}:9100"], "labels": {"job": "k8s-nodes", "nodename": "hzn-k8s-master-jilani"}}]
     for i in range(worker_count):
-        targets.append(f"10.20.0.{WORKER_BASE_IP + i}:9100")
+        ip = f"10.20.0.{WORKER_BASE_IP + i}:9100"
+        entries.append({"targets": [ip], "labels": {"job": "k8s-nodes", "nodename": f"hzn-k8s-worker-{i + 1}-jilani"}})
 
-    targets_json = json.dumps([{"targets": targets, "labels": {"job": "k8s-nodes"}}], indent=2)
-    Path(PROMETHEUS_CFG).write_text(targets_json)
+    Path(PROMETHEUS_CFG).write_text(json.dumps(entries, indent=2))
     logging.info("Prometheus targets updated — scraping %d worker(s)", worker_count)
 
 
+def node_exporter_up(ip, timeout=3):
+    """Return True only if node_exporter is reachable on the given IP."""
+    try:
+        urllib.request.urlopen(f"http://{ip}:9100/metrics", timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+
+def discover_from_hcloud():
+    """Query Hetzner API and return all k8s nodes as [(name, ip)] — no health check."""
+    token = os.environ.get("HCLOUD_TOKEN", "")
+    if not token:
+        logging.warning("HCLOUD_TOKEN not set — skipping Hetzner discovery")
+        return None
+    try:
+        req = urllib.request.Request(
+            "https://api.hetzner.cloud/v1/servers?per_page=50",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except Exception as e:
+        logging.error("Hetzner API error: %s", e)
+        return None
+
+    masters, workers = [], []
+    for server in data.get("servers", []):
+        name = server["name"]
+        private_nets = server.get("private_net", [])
+        if not private_nets:
+            continue
+        ip = private_nets[0]["ip"]
+        if "master" in name:
+            masters.append((name, ip))
+        elif "worker" in name:
+            workers.append((name, ip))
+
+    return masters + workers
+
+
+def build_entries(nodes):
+    """Build targets.json entries list from [(name, ip), ...] pairs."""
+    return [
+        {"targets": [f"{ip}:9100"], "labels": {"job": "k8s-nodes", "nodename": name}}
+        for name, ip in sorted(nodes, key=lambda x: x[1])
+    ]
+
+
+def sync_loop():
+    """Background thread: re-discover nodes every 60s and update targets.json if changed.
+
+    Rules:
+    - New server (in Hetzner, not in targets): add only if node_exporter is up
+    - Existing server (in targets): keep even if node_exporter is down (Prometheus fires NodeDown)
+    - Deleted server (not in Hetzner): always remove
+    """
+    while True:
+        time.sleep(60)
+        nodes = discover_from_hcloud()
+        if nodes is None:
+            continue
+
+        try:
+            current_entries = json.loads(Path(PROMETHEUS_CFG).read_text())
+            current_map = {
+                e["targets"][0].split(":")[0]: e["labels"].get("nodename", "")
+                for e in current_entries
+            }
+        except Exception:
+            current_map = {}
+
+        hcloud_map = {ip: name for name, ip in nodes}
+
+        merged = {}
+        # Keep existing targets if server still exists on Hetzner (even if node_exporter is down)
+        for ip, nodename in current_map.items():
+            if ip in hcloud_map:
+                merged[ip] = hcloud_map[ip]
+        # Add new servers only if node_exporter is already up (avoids NodeDown during provisioning)
+        for ip, name in hcloud_map.items():
+            if ip not in merged and node_exporter_up(ip):
+                merged[ip] = name
+
+        new_entries = [
+            {"targets": [f"{ip}:9100"], "labels": {"job": "k8s-nodes", "nodename": name}}
+            for ip, name in sorted(merged.items(), key=lambda x: x[0])
+        ]
+        new_targets = sorted(f"{ip}:9100" for ip in merged)
+        current_targets = sorted(t for e in current_entries for t in e["targets"]) if current_map else []
+
+        if new_targets != current_targets:
+            logging.info("Node discovery: targets changed %s → %s", current_targets, new_targets)
+            Path(PROMETHEUS_CFG).write_text(json.dumps(new_entries, indent=2))
+
+
 if __name__ == "__main__":
+    # Startup sync: discover nodes from Hetzner API and write targets.json
+    nodes = discover_from_hcloud()
+    if nodes:
+        entries = build_entries(nodes)
+        Path(PROMETHEUS_CFG).write_text(json.dumps(entries, indent=2))
+        logging.info("Startup sync: %s", [(n, ip) for n, ip in nodes])
+    else:
+        logging.warning("Startup sync failed — Hetzner API unavailable, keeping existing targets.json")
+
+    # Background thread: re-discover every 60s
+    t = threading.Thread(target=sync_loop, daemon=True)
+    t.start()
+    logging.info("Node discovery thread started (interval: 60s)")
+
     logging.info("Autoscaler webhook listening on :8080")
     HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()

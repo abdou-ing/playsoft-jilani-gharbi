@@ -6,8 +6,10 @@ groups:
         for: 2m
         labels:
           severity: warning
+          team: infra
         annotations:
-          summary: "High CPU on {{ $labels.instance }}"
+          summary: "High CPU — {{ $labels.nodename }}"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% (threshold: 70%) on node {{ $labels.nodename }} ({{ $labels.instance }}). Sustained high load may trigger auto scale-out."
 
       - alert: NodeCPUCritical
         expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 85
@@ -15,8 +17,10 @@ groups:
         labels:
           severity: critical
           action: scale-out
+          team: infra
         annotations:
-          summary: "CPU saturation on {{ $labels.instance }} — scale-out triggered"
+          summary: "CPU Saturation — {{ $labels.nodename }} → Scale-Out Triggered"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% (threshold: 85%) on node {{ $labels.nodename }} ({{ $labels.instance }}). A new worker node is being provisioned automatically."
 
   - name: node.scaledown
     rules:
@@ -27,8 +31,10 @@ groups:
         labels:
           severity: info
           action: scale-in
+          team: infra
         annotations:
-          summary: "Cluster CPU low ({{ $value | printf \"%.1f\" }}%) — scale-in triggered"
+          summary: "Low Cluster CPU — Scale-In Triggered"
+          description: "Average cluster CPU has been {{ $value | printf \"%.1f\" }}% (threshold: <20%) for 10 minutes. The last worker node will be removed to reduce costs."
 
   - name: node.availability
     rules:
@@ -37,8 +43,10 @@ groups:
         for: 1m
         labels:
           severity: critical
+          team: infra
         annotations:
-          summary: "Node {{ $labels.instance }} is unreachable"
+          summary: "Node Unreachable — {{ $labels.nodename }}"
+          description: "Node {{ $labels.nodename }} ({{ $labels.instance }}) has been unreachable for more than 1 minute. node_exporter is not responding. Immediate investigation required."
 
   - name: node.memory
     rules:
@@ -48,8 +56,10 @@ groups:
         for: 2m
         labels:
           severity: warning
+          team: infra
         annotations:
-          summary: "High memory on {{ $labels.instance }}: {{ $value | printf \"%.1f\" }}% used"
+          summary: "High Memory — {{ $labels.nodename }}"
+          description: "Memory usage is {{ $value | printf \"%.1f\" }}% (threshold: 80%) on node {{ $labels.nodename }} ({{ $labels.instance }}). Available: {{ with query \"node_memory_MemAvailable_bytes{instance='\" }}{{ . | first | value | humanize }}{{ end }}."
 
       - alert: NodeMemoryCritical
         expr: |
@@ -57,8 +67,10 @@ groups:
         for: 2m
         labels:
           severity: critical
+          team: infra
         annotations:
-          summary: "Memory critical on {{ $labels.instance }}: {{ $value | printf \"%.1f\" }}% used"
+          summary: "Critical Memory — {{ $labels.nodename }}"
+          description: "Memory usage is {{ $value | printf \"%.1f\" }}% (threshold: 90%) on node {{ $labels.nodename }} ({{ $labels.instance }}). OOM risk — immediate action required."
 
   - name: node.disk
     rules:
@@ -68,8 +80,10 @@ groups:
         for: 5m
         labels:
           severity: warning
+          team: infra
         annotations:
-          summary: "Disk filling on {{ $labels.instance }}: {{ $value | printf \"%.1f\" }}% used"
+          summary: "Disk Filling — {{ $labels.nodename }}"
+          description: "Disk usage on / is {{ $value | printf \"%.1f\" }}% (threshold: 75%) on node {{ $labels.nodename }} ({{ $labels.instance }}). Plan cleanup or expansion soon."
 
       - alert: NodeDiskCritical
         expr: |
@@ -77,5 +91,7 @@ groups:
         for: 5m
         labels:
           severity: critical
+          team: infra
         annotations:
-          summary: "Disk almost full on {{ $labels.instance }}: {{ $value | printf \"%.1f\" }}% used"
+          summary: "Disk Almost Full — {{ $labels.nodename }}"
+          description: "Disk usage on / is {{ $value | printf \"%.1f\" }}% (threshold: 90%) on node {{ $labels.nodename }} ({{ $labels.instance }}). Immediate cleanup required — services may fail."

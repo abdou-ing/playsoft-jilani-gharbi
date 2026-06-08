@@ -1,0 +1,14 @@
+[Unit]
+Description=Alertmanager
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/alertmanager \
+  --config.file=/opt/infra/prometheus/config/alertmanager.yml \
+  --storage.path=/var/lib/alertmanager \
+  --web.external-url=http://188.245.215.21:9093
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target

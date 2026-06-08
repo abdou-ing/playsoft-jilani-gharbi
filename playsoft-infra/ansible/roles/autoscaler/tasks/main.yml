@@ -16,6 +16,7 @@
     url: https://apt.releases.hashicorp.com/gpg
     dest: /usr/share/keyrings/hashicorp.gpg
     mode: "0644"
+    force: false
 
 - name: Add HashiCorp apt repo
   apt_repository:
@@ -35,48 +36,69 @@
 
 - name: Download Alertmanager binary
   unarchive:
-    src: https://github.com/prometheus/alertmanager/releases/download/v0.32.1/alertmanager-0.32.1.linux-amd64.tar.gz
+    src: "https://github.com/prometheus/alertmanager/releases/download/v{{ alertmanager_version }}/alertmanager-{{ alertmanager_version }}.{{ alertmanager_arch }}.tar.gz"
     dest: /tmp
     remote_src: true
-    creates: /tmp/alertmanager-0.32.1.linux-amd64/alertmanager
+    creates: "{{ alertmanager_bin }}"
 
-- name: Install alertmanager binary to /usr/local/bin
+- name: Install alertmanager binary
   copy:
-    src: /tmp/alertmanager-0.32.1.linux-amd64/alertmanager
-    dest: /usr/local/bin/alertmanager
+    src: "/tmp/alertmanager-{{ alertmanager_version }}.{{ alertmanager_arch }}/alertmanager"
+    dest: "{{ alertmanager_bin }}"
     mode: "0755"
     remote_src: true
+    force: false
 
 - name: Create alertmanager storage dir
   file:
-    path: /var/lib/alertmanager
+    path: "{{ alertmanager_storage }}"
     state: directory
     mode: "0755"
 
+# ── Token env file (root-only, not visible in service unit) ───────────────────
+
+- name: Create /etc/autoscaler directory
+  file:
+    path: /etc/autoscaler
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+
+- name: Write HCLOUD_TOKEN to env file
+  copy:
+    dest: /etc/autoscaler/env
+    content: "HCLOUD_TOKEN={{ lookup('env', 'HCLOUD_TOKEN') }}\n"
+    mode: "0600"
+    owner: root
+    group: root
+  no_log: true
+  notify: reload systemd and restart autoscaler
+
 # ── Project files ──────────────────────────────────────────────────────────────
 
-- name: Create /opt/infra/prometheus directory tree
+- name: Create {{ infra_base }} directory tree
   file:
     path: "{{ item }}"
     state: directory
     mode: "0755"
   loop:
-    - /opt/infra/prometheus
-    - /opt/infra/prometheus/webhook
-    - /opt/infra/prometheus/config
-    - /opt/infra/prometheus/ansible
-    - /opt/infra/prometheus/terraform
+    - "{{ infra_base }}"
+    - "{{ infra_base }}/webhook"
+    - "{{ infra_base }}/config"
+    - "{{ infra_base }}/ansible"
+    - "{{ infra_base }}/terraform"
 
 - name: Copy webhook script
   copy:
     src: "{{ playbook_dir }}/../prometheus/webhook/webhook.py"
-    dest: /opt/infra/prometheus/webhook/webhook.py
+    dest: "{{ infra_base }}/webhook/webhook.py"
     mode: "0755"
 
 - name: Copy Prometheus config files
   copy:
     src: "{{ playbook_dir }}/../prometheus/config/{{ item }}"
-    dest: "/opt/infra/prometheus/config/{{ item }}"
+    dest: "{{ infra_base }}/config/{{ item }}"
   loop:
     - prometheus.yml
     - alerts.yml
@@ -84,18 +106,18 @@
 - name: Template alertmanager config
   template:
     src: alertmanager.yml.j2
-    dest: /opt/infra/prometheus/config/alertmanager.yml
+    dest: "{{ infra_base }}/config/alertmanager.yml"
     mode: "0644"
 
 - name: Copy Ansible join-worker playbook
   copy:
     src: "{{ playbook_dir }}/../prometheus/ansible/join-worker.yml"
-    dest: /opt/infra/prometheus/ansible/join-worker.yml
+    dest: "{{ infra_base }}/ansible/join-worker.yml"
 
 - name: Sync Terraform files to bastion
   synchronize:
     src: "{{ playbook_dir }}/../prometheus/terraform/"
-    dest: /opt/infra/prometheus/terraform/
+    dest: "{{ infra_base }}/terraform/"
     rsync_opts:
       - "--exclude=.terraform"
       - "--exclude=.terraform.lock.hcl"
@@ -103,9 +125,12 @@
 - name: Run terraform init
   command: terraform init -upgrade
   args:
-    chdir: /opt/infra/prometheus/terraform
+    chdir: "{{ infra_base }}/terraform"
+    creates: "{{ infra_base }}/terraform/.terraform"
   environment:
     HCLOUD_TOKEN: "{{ lookup('env', 'HCLOUD_TOKEN') }}"
+
+# ── Systemd units ──────────────────────────────────────────────────────────────
 
 - name: Create prometheus systemd override dir
   file:
@@ -113,37 +138,14 @@
     state: directory
     mode: "0755"
 
-- name: Override prometheus to read config from /opt/infra
+- name: Override prometheus to read config from {{ infra_base }}
   copy:
+    src: prometheus-override.conf
     dest: /etc/systemd/system/prometheus.service.d/override.conf
     mode: "0644"
-    content: |
-      [Service]
-      ExecStart=
-      ExecStart=/usr/bin/prometheus \
-        --config.file=/opt/infra/prometheus/config/prometheus.yml \
-        --storage.tsdb.path=/var/lib/prometheus/data \
-        --web.console.libraries=/usr/share/prometheus/console_libraries \
-        --web.console.templates=/usr/share/prometheus/consoles
   notify: reload prometheus
 
-- name: Read Terraform state to get current node IPs
-  command: terraform output -json worker_private_ips
-  args:
-    chdir: /opt/infra/prometheus/terraform
-  register: tf_worker_ips
-  changed_when: false
-  environment:
-    HCLOUD_TOKEN: "{{ lookup('env', 'HCLOUD_TOKEN') }}"
-
-- name: Generate initial targets.json from Terraform state
-  copy:
-    dest: /opt/infra/prometheus/config/targets.json
-    content: "{{ [{'targets': ['10.20.0.10:9100'] + (tf_worker_ips.stdout | from_json | map('regex_replace', '$', ':9100') | list), 'labels': {'job': 'k8s-nodes'}}] | to_nice_json }}"
-
-# ── Systemd units ──────────────────────────────────────────────────────────────
-
-- name: Install autoscaler systemd unit (token injected from env)
+- name: Install autoscaler systemd unit
   template:
     src: autoscaler.service.j2
     dest: /etc/systemd/system/autoscaler.service
@@ -152,10 +154,26 @@
 
 - name: Install alertmanager systemd unit
   copy:
-    src: "{{ playbook_dir }}/../prometheus/systemd/alertmanager.service"
+    src: alertmanager.service
     dest: /etc/systemd/system/alertmanager.service
     mode: "0644"
   notify: reload systemd and restart alertmanager
+
+# ── Generate initial Prometheus scrape targets ─────────────────────────────────
+
+- name: Read Terraform state to get current node IPs
+  command: terraform output -json worker_private_ips
+  args:
+    chdir: "{{ infra_base }}/terraform"
+  register: tf_worker_ips
+  changed_when: false
+  environment:
+    HCLOUD_TOKEN: "{{ lookup('env', 'HCLOUD_TOKEN') }}"
+
+- name: Generate initial targets.json from Terraform state
+  copy:
+    dest: "{{ infra_base }}/config/targets.json"
+    content: "{{ [{'targets': [master_ip + ':9100'] + (tf_worker_ips.stdout | from_json | map('regex_replace', '$', ':9100') | list), 'labels': {'job': 'k8s-nodes'}}] | to_nice_json }}"
 
 # ── Ensure all services are running ───────────────────────────────────────────
 
@@ -171,9 +189,11 @@
     name: alertmanager
     state: started
     enabled: true
+    daemon_reload: true
 
 - name: Ensure autoscaler is running
   systemd:
     name: autoscaler
     state: started
     enabled: true
+    daemon_reload: true

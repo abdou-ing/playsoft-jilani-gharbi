@@ -30,16 +30,48 @@ receivers:
         require_tls: true
         send_resolved: true
         headers:
-          Subject: '{% raw %}[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }} — {{ .CommonAnnotations.summary }}{% endraw %}'
-        text: |
-          {% raw %}{{ range .Alerts }}
-          Alert:    {{ .Labels.alertname }}
-          Status:   {{ .Status | toUpper }}
-          Server:   {{ .Labels.instance }}
-          Severity: {{ .Labels.severity }}
-          Message:  {{ .Annotations.summary }}
-          Time:     {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
-          {{ end }}{% endraw %}
+          Subject: '{% raw %}[{{ .Status | toUpper }}] {{ .CommonAnnotations.summary }}{% endraw %}'
+        html: |
+          {% raw %}<!DOCTYPE html>
+          <html>
+          <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;">
+          {{ range .Alerts }}
+          <div style="background:#fff;border-radius:8px;padding:24px;max-width:600px;margin:auto;border-left:6px solid {{ if eq .Status "resolved" }}#28a745{{ else if eq .Labels.severity "critical" }}#dc3545{{ else }}#ffc107{{ end }};">
+
+            <h2 style="margin:0 0 4px;color:{{ if eq .Status "resolved" }}#28a745{{ else if eq .Labels.severity "critical" }}#dc3545{{ else }}#ffc107{{ end }};">
+              {{ if eq .Status "resolved" }}✅ RESOLVED{{ else }}🚨 FIRING{{ end }} — {{ .Labels.alertname }}
+            </h2>
+            <p style="margin:0 0 20px;color:#555;font-size:15px;">{{ .Annotations.summary }}</p>
+
+            <table style="width:100%;border-collapse:collapse;font-size:14px;">
+              <tr style="background:#f9f9f9;">
+                <td style="padding:8px 12px;font-weight:bold;color:#333;width:30%;">Node</td>
+                <td style="padding:8px 12px;color:#555;">{{ .Labels.nodename }} &nbsp;·&nbsp; <code>{{ .Labels.instance }}</code></td>
+              </tr>
+              <tr>
+                <td style="padding:8px 12px;font-weight:bold;color:#333;">Severity</td>
+                <td style="padding:8px 12px;color:#555;">{{ .Labels.severity | toUpper }}</td>
+              </tr>
+              <tr style="background:#f9f9f9;">
+                <td style="padding:8px 12px;font-weight:bold;color:#333;">Fired at</td>
+                <td style="padding:8px 12px;color:#555;">{{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}</td>
+              </tr>
+              {{ if eq .Status "resolved" }}
+              <tr>
+                <td style="padding:8px 12px;font-weight:bold;color:#333;">Resolved at</td>
+                <td style="padding:8px 12px;color:#28a745;">{{ .EndsAt.Format "2006-01-02 15:04:05 UTC" }}</td>
+              </tr>
+              {{ end }}
+            </table>
+
+            <div style="margin-top:16px;padding:12px;background:#f0f0f0;border-radius:4px;font-size:13px;color:#444;">
+              {{ .Annotations.description }}
+            </div>
+
+          </div>
+          {{ end }}
+          </body>
+          </html>{% endraw %}
 
   - name: autoscaler
     webhook_configs:

@@ -1,0 +1,8 @@
+---
+alertmanager_version: "0.32.1"
+alertmanager_arch: "linux-amd64"
+alertmanager_bin: "/usr/local/bin/alertmanager"
+alertmanager_storage: "/var/lib/alertmanager"
+
+master_ip: "10.20.0.10"
+infra_base: "/opt/infra/prometheus"
