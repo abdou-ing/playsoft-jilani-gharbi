@@ -1,0 +1,54 @@
+flowchart TD
+    classDef trigger fill:#2c3e50,color:#fff,stroke:#1a252f,font-weight:bold
+    classDef eval    fill:#2980b9,color:#fff,stroke:#1f618d
+    classDef ok      fill:#27ae60,color:#fff,stroke:#1e8449
+    classDef warn    fill:#f39c12,color:#000,stroke:#ca8a04
+    classDef crit    fill:#e74c3c,color:#fff,stroke:#c0392b
+    classDef infra   fill:#8e44ad,color:#fff,stroke:#76359d
+    classDef skip    fill:#95a5a6,color:#fff,stroke:#717d7e
+
+    START(["Prometheus\nevaluates rules\nevery 15s"]):::trigger
+
+    START --> CPU_CHECK{"CPU usage ?"}:::eval
+    START --> UP_CHECK{"node_exporter up ?"}:::eval
+    START --> MEM_CHECK{"Memory usage ?"}:::eval
+    START --> DISK_CHECK{"Disk / usage ?"}:::eval
+
+    CPU_CHECK  -->|"above 85% for 2min"| CRIT_CPU["NodeCPUCritical\nseverity=critical\naction=scale-out"]:::crit
+    CPU_CHECK  -->|"above 70% for 2min"| WARN_CPU["NodeCPUWarning\nseverity=warning"]:::warn
+    CPU_CHECK  -->|"avg cluster below 20% for 10min"| LOW_CPU["NodeCPULow\nseverity=info\naction=scale-in"]:::eval
+    UP_CHECK   -->|"up==0 for 1min"| NODE_DOWN["NodeDown\nseverity=critical"]:::crit
+    MEM_CHECK  -->|"above 90% for 2min"| CRIT_MEM["NodeMemoryCritical\nseverity=critical"]:::crit
+    MEM_CHECK  -->|"above 80% for 2min"| WARN_MEM["NodeMemoryWarning\nseverity=warning"]:::warn
+    DISK_CHECK -->|"above 90% for 5min"| CRIT_DISK["NodeDiskCritical\nseverity=critical"]:::crit
+    DISK_CHECK -->|"above 75% for 5min"| WARN_DISK["NodeDiskWarning\nseverity=warning"]:::warn
+
+    CRIT_CPU --> AM_ROUTE{"Alertmanager routing"}:::eval
+    LOW_CPU  --> AM_ROUTE
+
+    WARN_CPU  --> AM_EMAIL["Email only\nFIRING warning"]:::infra
+    NODE_DOWN --> AM_EMAIL
+    CRIT_MEM  --> AM_EMAIL
+    WARN_MEM  --> AM_EMAIL
+    CRIT_DISK --> AM_EMAIL
+    WARN_DISK --> AM_EMAIL
+
+    AM_ROUTE -->|"severity=critical\naction=scale-out"| CD_OUT{"Cooldown\n600s elapsed ?"}:::eval
+    AM_ROUTE -->|"action=scale-in"| CD_IN{"Cooldown\n600s elapsed ?"}:::eval
+
+    CD_OUT -->|"NO"| SK_OUT["Skip\ncooldown active"]:::skip
+    CD_OUT -->|"YES"| SCALEOUT["SCALE-OUT\nTerraform +1 worker\nAnsible join\ntargets.json update\nrepeat 15m"]:::ok
+
+    CD_IN -->|"NO"| SK_IN["Skip\ncooldown active"]:::skip
+    CD_IN -->|"YES"| MIN_CHECK{"workers >= 2 ?"}:::eval
+
+    MIN_CHECK -->|"NO — already 1"| SK_MIN["Skip\nminimum reached"]:::skip
+    MIN_CHECK -->|"YES"| SCALEIN["SCALE-IN\nRemove from targets\nkubectl drain\nkubectl delete\nTerraform -1 worker\nrepeat 20m"]:::ok
+
+    SCALEOUT --> EM_OUT["Email FIRING\nCPU Saturation\nScale-Out Triggered"]:::infra
+    SCALEIN  --> EM_IN["Email FIRING\nLow Cluster CPU\nScale-In Triggered"]:::infra
+
+    EM_OUT   --> RESOLVE["resolve_timeout 5m\nalert resolves"]:::eval
+    EM_IN    --> RESOLVE
+    AM_EMAIL --> RESOLVE
+    RESOLVE  --> EM_RES["Email RESOLVED\ngreen card"]:::infra
