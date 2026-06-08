@@ -22,11 +22,11 @@ route:
 receivers:
   - name: default
     email_configs:
-      - to: jilanigharbi88@gmail.com
-        from: gharbijilani001@gmail.com
+      - to: <ALERT_RECIPIENT_EMAIL>
+        from: <ALERT_SENDER_EMAIL>
         smarthost: smtp.gmail.com:587
-        auth_username: gharbijilani001@gmail.com
-        auth_password: foxmdtbtnnlxjxat
+        auth_username: <ALERT_SENDER_EMAIL>
+        auth_password: <GMAIL_APP_PASSWORD>
         require_tls: true
         send_resolved: true
         headers:

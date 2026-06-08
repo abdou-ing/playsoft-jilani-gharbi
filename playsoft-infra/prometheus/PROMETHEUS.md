@@ -2,7 +2,7 @@
 
 ## Overview
 
-This pipeline runs on a **Hetzner Cloud bastion server** (`188.245.215.21`) and does three things automatically:
+This pipeline runs on a **Hetzner Cloud bastion server** (`<BASTION_PUBLIC_IP>`) and does three things automatically:
 
 1. **Monitors** all Kubernetes nodes with Prometheus + node_exporter
 2. **Alerts** by email (Alertmanager) when something is wrong
@@ -14,7 +14,7 @@ This pipeline runs on a **Hetzner Cloud bastion server** (`188.245.215.21`) and 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                  Bastion 188.245.215.21                  │
+│                  Bastion <BASTION_PUBLIC_IP>                  │
 │                                                         │
 │  ┌───────────┐   scrape    ┌──────────────────────────┐ │
 │  │ Prometheus│ ──────────► │  targets.json (dynamic)  │ │
@@ -23,7 +23,7 @@ This pipeline runs on a **Hetzner Cloud bastion server** (`188.245.215.21`) and 
 │        │ alert             │  worker2 10.20.0.12:9100  │ │
 │        ▼                   └──────────────────────────┘ │
 │  ┌─────────────┐                                        │
-│  │ Alertmanager│ ──► email (jilanigharbi88@gmail.com)   │
+│  │ Alertmanager│ ──► email (<ALERT_RECIPIENT_EMAIL>)   │
 │  │   :9093     │ ──► webhook (localhost:8080)           │
 │  └─────────────┘                                        │
 │        │                                                │
@@ -152,8 +152,8 @@ This file is the bridge between the autoscaler and Prometheus. It is written by 
 **Format:**
 ```json
 [
-  {"targets": ["10.20.0.10:9100"], "labels": {"job": "k8s-nodes", "nodename": "hzn-k8s-master-jilani"}},
-  {"targets": ["10.20.0.11:9100"], "labels": {"job": "k8s-nodes", "nodename": "hzn-k8s-worker-1-jilani"}}
+  {"targets": ["10.20.0.10:9100"], "labels": {"job": "k8s-nodes", "nodename": "<MASTER_NODE_NAME>"}},
+  {"targets": ["10.20.0.11:9100"], "labels": {"job": "k8s-nodes", "nodename": "<WORKER_NODE_NAME_1>"}}
 ]
 ```
 
@@ -232,10 +232,10 @@ All alerts
 
 ### Receivers
 
-**`default`** — email to `jilanigharbi88@gmail.com`:
+**`default`** — email to `<ALERT_RECIPIENT_EMAIL>`:
 - Sends on firing AND resolved (`send_resolved: true`)
 - Custom HTML template: colored card (red for firing, green for resolved), clean table with node name, severity, timestamps
-- Subject: `[FIRING] Node Unreachable — hzn-k8s-worker-1-jilani`
+- Subject: `[FIRING] Node Unreachable — <WORKER_NODE_NAME_1>`
 
 **`autoscaler`** — HTTP POST to `localhost:8080`:
 - Does NOT send on resolved (`send_resolved: false`)
@@ -248,8 +248,8 @@ All alerts
 systemctl restart alertmanager
 
 # or from local machine
-scp -i ~/.ssh/jilani /tmp/alertmanager.yml root@188.245.215.21:/opt/infra/prometheus/config/alertmanager.yml
-ssh -i ~/.ssh/jilani root@188.245.215.21 "systemctl restart alertmanager"
+scp -i ~/.ssh/<SSH_KEY_NAME> /tmp/alertmanager.yml root@<BASTION_PUBLIC_IP>:/opt/infra/prometheus/config/alertmanager.yml
+ssh -i ~/.ssh/<SSH_KEY_NAME> root@<BASTION_PUBLIC_IP> "systemctl restart alertmanager"
 ```
 
 ---
@@ -309,9 +309,9 @@ Manages **worker nodes only**. The master is pre-existing and not managed by Ter
 
 **Key variable:** `worker_count` — changed at runtime by `webhook.py` via `terraform apply -var worker_count=N`.
 
-**Worker naming:** `hzn-k8s-worker-{N}-jilani`  
+**Worker naming:** `<WORKER_NODE_NAME_N>`  
 **Worker IPs:** `10.20.0.11`, `10.20.0.12`, ... (sequential, no DHCP)  
-**Image:** latest Hetzner snapshot with selector `created_by=jilani,role=k8s_master_and_worker`
+**Image:** latest Hetzner snapshot with selector `created_by=<YOUR_LABEL>,role=k8s_master_and_worker`
 
 ---
 
@@ -365,7 +365,7 @@ This playbook runs from the bastion (which is on the same private network as the
 ### Send a test alert manually
 
 ```bash
-ssh -i ~/.ssh/jilani root@188.245.215.21 "
+ssh -i ~/.ssh/<SSH_KEY_NAME> root@<BASTION_PUBLIC_IP> "
 curl -s -X POST http://localhost:9093/api/v2/alerts \
   -H 'Content-Type: application/json' \
   -d '[{
@@ -375,10 +375,10 @@ curl -s -X POST http://localhost:9093/api/v2/alerts \
       \"team\": \"infra\",
       \"job\": \"k8s-nodes\",
       \"instance\": \"10.20.0.11:9100\",
-      \"nodename\": \"hzn-k8s-worker-1-jilani\"
+      \"nodename\": \"<WORKER_NODE_NAME_1>\"
     },
     \"annotations\": {
-      \"summary\": \"Node Unreachable — hzn-k8s-worker-1-jilani\",
+      \"summary\": \"Node Unreachable — <WORKER_NODE_NAME_1>\",
       \"description\": \"Test alert — node_exporter not responding.\"
     },
     \"startsAt\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
@@ -389,7 +389,7 @@ curl -s -X POST http://localhost:9093/api/v2/alerts \
 ### Trigger scale-out manually
 
 ```bash
-ssh -i ~/.ssh/jilani root@188.245.215.21 "
+ssh -i ~/.ssh/<SSH_KEY_NAME> root@<BASTION_PUBLIC_IP> "
 curl -s -X POST http://localhost:8080 \
   -H 'Content-Type: application/json' \
   -d '{\"alerts\": [{\"status\": \"firing\", \"labels\": {\"action\": \"scale-out\"}}]}'
@@ -399,21 +399,21 @@ curl -s -X POST http://localhost:8080 \
 ### Check current targets
 
 ```bash
-ssh -i ~/.ssh/jilani root@188.245.215.21 "cat /opt/infra/prometheus/config/targets.json"
+ssh -i ~/.ssh/<SSH_KEY_NAME> root@<BASTION_PUBLIC_IP> "cat /opt/infra/prometheus/config/targets.json"
 ```
 
 ### Check active alerts in Alertmanager
 
 ```bash
-curl -s http://188.245.215.21:9093/api/v2/alerts | python3 -m json.tool
+curl -s http://<BASTION_PUBLIC_IP>:9093/api/v2/alerts | python3 -m json.tool
 ```
 
 ### Stop the autoscaler temporarily
 
 ```bash
-ssh -i ~/.ssh/jilani root@188.245.215.21 "systemctl stop autoscaler"
+ssh -i ~/.ssh/<SSH_KEY_NAME> root@<BASTION_PUBLIC_IP> "systemctl stop autoscaler"
 # to restart:
-ssh -i ~/.ssh/jilani root@188.245.215.21 "systemctl start autoscaler"
+ssh -i ~/.ssh/<SSH_KEY_NAME> root@<BASTION_PUBLIC_IP> "systemctl start autoscaler"
 ```
 
 ---

@@ -66,7 +66,7 @@ prometheus/
 ├── ansible/
 │   └── join-worker.yml      # Installs k8s packages and joins node to cluster
 ├── terraform/
-│   ├── main.tf              # Uses k8s-worker module, references nw-jilani network
+│   ├── main.tf              # Uses k8s-worker module, references <HCLOUD_NETWORK_NAME> network
 │   ├── outputs.tf           # worker_private_ips, master_private_ip
 │   ├── provider.tf          # Hetzner provider (token from HCLOUD_TOKEN env var)
 │   ├── variables.tf
@@ -108,7 +108,7 @@ The automation engine — listens for alerts and drives the full scale-out seque
 SSH into the master before running `deploy.sh` on the bastion:
 
 ```bash
-ssh -i /root/.ssh/jilani root@10.20.0.10
+ssh -i /root/.ssh/<SSH_KEY_NAME> root@10.20.0.10
 ```
 
 ### 1. Install and start node_exporter
@@ -139,11 +139,11 @@ The master should appear as `Ready`. If not, run `kubeadm init` before proceedin
 
 | Resource | Name | Notes |
 |---|---|---|
-| Private network | `nw-jilani` | CIDR `10.20.0.0/24`, gateway `10.20.0.1` |
-| SSH key | `jilani-key` | Uploaded to Hetzner, private key at `/root/.ssh/jilani` on bastion |
-| k8s master | `hzn-k8s-master-jilani` | Already running at `10.20.0.10`, kubeadm initialised |
+| Private network | `<HCLOUD_NETWORK_NAME>` | CIDR `10.20.0.0/24`, gateway `10.20.0.1` |
+| SSH key | `<HCLOUD_SSH_KEY_NAME>` | Uploaded to Hetzner, private key at `/root/.ssh/<SSH_KEY_NAME>` on bastion |
+| k8s master | `<MASTER_NODE_NAME>` | Already running at `10.20.0.10`, kubeadm initialised |
 | node_exporter | running on master | Listening on `:9100` |
-| Snapshot image | label `created_by=jilani,role=k8s_master_and_worker` | Base image for workers |
+| Snapshot image | label `created_by=<YOUR_LABEL>,role=k8s_master_and_worker` | Base image for workers |
 
 ### On the Bastion Host
 
@@ -208,7 +208,7 @@ If worker-1 was created outside of this Terraform (e.g. manually or by another c
 ```bash
 # Get the server ID from Hetzner API
 curl -s -H "Authorization: Bearer $HCLOUD_TOKEN" \
-  "https://api.hetzner.cloud/v1/servers?name=hzn-k8s-worker-1-jilani" \
+  "https://api.hetzner.cloud/v1/servers?name=<WORKER_NODE_NAME_1>" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['servers'][0]['id'])"
 
 # Import into state (replace 123456789 with the real ID)
@@ -267,7 +267,7 @@ worker_count = 1       # starting count
 SSH to the master and spike the CPU:
 
 ```bash
-ssh -i /root/.ssh/jilani root@10.20.0.10 "stress --cpu 4 --timeout 360"
+ssh -i /root/.ssh/<SSH_KEY_NAME> root@10.20.0.10 "stress --cpu 4 --timeout 360"
 ```
 
 ### Watch the pipeline live
@@ -292,7 +292,7 @@ INFO Prometheus updated — scraping 2 worker(s)
 ### Verify node joined the cluster
 
 ```bash
-ssh -i /root/.ssh/jilani root@10.20.0.10 "kubectl get nodes"
+ssh -i /root/.ssh/<SSH_KEY_NAME> root@10.20.0.10 "kubectl get nodes"
 ```
 
 ### Monitor in the browser
@@ -306,9 +306,9 @@ ssh -i /root/.ssh/jilani root@10.20.0.10 "kubectl get nodes"
 
 ```bash
 # 1. Drain and remove the node from k8s
-ssh -i /root/.ssh/jilani root@10.20.0.10 \
-  "kubectl drain hzn-k8s-worker-2-jilani --ignore-daemonsets --delete-emptydir-data && \
-   kubectl delete node hzn-k8s-worker-2-jilani"
+ssh -i /root/.ssh/<SSH_KEY_NAME> root@10.20.0.10 \
+  "kubectl drain <WORKER_NODE_NAME_2> --ignore-daemonsets --delete-emptydir-data && \
+   kubectl delete node <WORKER_NODE_NAME_2>"
 
 # 2. Scale Terraform back to 1 worker
 cd /opt/infra/prometheus/terraform
@@ -338,8 +338,8 @@ Terraform state is empty. Import the existing worker first (see Setup step 4).
 The node joined with a different hostname than the Ansible inventory name. The playbook uses `ansible_hostname` (the real system hostname) — verify the worker's hostname matches what `kubectl get nodes` shows:
 
 ```bash
-ssh -i /root/.ssh/jilani -o ProxyJump=root@10.20.0.10 root@10.20.0.12 "hostname"
-ssh -i /root/.ssh/jilani root@10.20.0.10 "kubectl get nodes"
+ssh -i /root/.ssh/<SSH_KEY_NAME> -o ProxyJump=root@10.20.0.10 root@10.20.0.12 "hostname"
+ssh -i /root/.ssh/<SSH_KEY_NAME> root@10.20.0.10 "kubectl get nodes"
 ```
 
 ### Worker stuck in `NotReady`
@@ -347,7 +347,7 @@ ssh -i /root/.ssh/jilani root@10.20.0.10 "kubectl get nodes"
 Usually resolves itself within 1-2 minutes after cloud-init completes. Check kubelet logs on the worker:
 
 ```bash
-ssh -i /root/.ssh/jilani -o ProxyJump=root@10.20.0.10 root@10.20.0.11 \
+ssh -i /root/.ssh/<SSH_KEY_NAME> -o ProxyJump=root@10.20.0.10 root@10.20.0.11 \
   "journalctl -u kubelet -n 30"
 ```
 
@@ -367,7 +367,7 @@ terraform apply -auto-approve -var-file=env/dev.tfvars -var=worker_count=1
 | Secret | Location | How it's handled |
 |---|---|---|
 | `HCLOUD_TOKEN` | `systemd/autoscaler.service` on bastion | Never stored in the repo — Ansible reads it from the local `HCLOUD_TOKEN` env var at deploy time via `lookup('env', 'HCLOUD_TOKEN')` and writes it directly into the systemd unit |
-| SSH private key | `/root/.ssh/jilani` on bastion | Not stored in the repo |
+| SSH private key | `/root/.ssh/<SSH_KEY_NAME>` on bastion | Not stored in the repo |
 
 **Never commit the real token to git.** Export it in your shell before running Ansible:
 
