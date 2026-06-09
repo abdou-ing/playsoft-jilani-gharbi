@@ -1,7 +1,8 @@
 
 
 data "hcloud_networks" "private_networks" {
-  with_selector = "name=instalab_private_network,env=${var.environment}"
+  count         = var.network_id == null ? 1 : 0
+  with_selector = "name=${var.network_name},env=${var.environment}"
 }
 
 #data "hcloud_certificate" "totolabbyfr" {

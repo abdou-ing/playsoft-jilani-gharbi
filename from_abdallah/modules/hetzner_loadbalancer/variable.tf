@@ -2,6 +2,37 @@
 # or using the -var="hcloud_token=..." CLI option
 variable "hcloud_token" {
   sensitive = true
+  default   = ""
+}
+
+variable "lb_name" {
+  description = "Name for the load balancer"
+  type        = string
+  default     = "instalab-load-balancer"
+}
+
+variable "network_id" {
+  description = "Direct Hetzner network ID. If provided, skips label-based network lookup."
+  type        = number
+  default     = null
+}
+
+variable "network_name" {
+  description = "Network label selector name (used only when network_id is null)"
+  type        = string
+  default     = "instalab_private_network"
+}
+
+variable "listen_port" {
+  description = "Port the load balancer listens on"
+  type        = number
+  default     = 80
+}
+
+variable "destination_port" {
+  description = "Backend port traffic is forwarded to"
+  type        = number
+  default     = 30080
 }
 
 variable "lb_location" {

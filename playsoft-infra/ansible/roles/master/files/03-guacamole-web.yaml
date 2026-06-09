@@ -7,9 +7,14 @@ spec:
   type: NodePort
   ports:
     - port: 8080
+      protocol: TCP
       nodePort: 30080
   selector:
     app: guacamole-web
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
 
 ---
 apiVersion: apps/v1
@@ -18,7 +23,6 @@ metadata:
   name: guacamole-web
   namespace: guacamole
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: guacamole-web
@@ -29,7 +33,7 @@ spec:
     spec:
       containers:
       - name: guacamole-web
-        image: jilanigh/custom-guac-ui:1.2
+        image: jilanigh/guacamole:redis-v1
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -57,3 +61,42 @@ spec:
               key: postgres-password
         - name: POSTGRESQL_ENABLED
           value: "true"
+        # ── Redis session store ──────────────────────────────
+        # These env vars are read by our custom HashTokenSessionMap.
+        # REDIS_HOSTNAME must match the Service name in 05-redis.yaml.
+        - name: REDIS_HOSTNAME
+          value: "redis"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: redis-password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: guacamole-web
+  namespace: guacamole
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: guacamole-web
+  minReplicas: 3
+  maxReplicas: 9
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70

@@ -21,7 +21,7 @@
     - common
 
 - name: Configure Kubernetes masters
-  hosts: masters
+  hosts: k8s_master_servers
   become: true
   tags: [k8s_cluster]
   roles:
@@ -29,7 +29,7 @@
     - clone-repo-guacamole
 
 - name: Configure Kubernetes workers
-  hosts: workers
+  hosts: k8s_workers
   become: true
   tags: [k8s_cluster]
   roles:

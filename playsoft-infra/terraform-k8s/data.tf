@@ -1,3 +1,4 @@
 data "hcloud_network" "main" {
-  name = "nw-jilani" 
+  name = var.network_name
 }
+
