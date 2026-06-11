@@ -1,0 +1,7 @@
+#!/bin/bash
+# Container detection script
+[[ -f /.dockerenv ]] || \
+[[ -f /run/.containerenv ]] || \
+[[ -n "${container:-}" ]] || \
+[[ $(systemd-detect-virt 2>/dev/null) =~ ^(docker|lxc|podman|container)$ ]] || \
+[[ $(cat /proc/1/cgroup 2>/dev/null | grep -q docker) ]]
