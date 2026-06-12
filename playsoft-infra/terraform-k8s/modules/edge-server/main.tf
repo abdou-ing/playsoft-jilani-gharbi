@@ -8,6 +8,7 @@ resource "hcloud_server" "edge" {
 
   user_data = templatefile("${path.module}/../../cloud-init/edge.yaml", {
     private_network_cidr = var.private_network_cidr
+    lb_ip                = var.lb_ip
   })
 
   public_net {

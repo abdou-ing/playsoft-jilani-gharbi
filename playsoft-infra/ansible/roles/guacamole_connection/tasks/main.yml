@@ -5,7 +5,7 @@
 
 - name: Derive VM lists
   set_fact:
-    linux_vm_ids_list: "{{ (tf.vnc_vm_ids.value | flatten) if (tf.vnc_vm_ids is defined and tf.vnc_vm_ids.value is defined) else [] }}"
+    linux_vm_ids_list: "{{ (tf.ssh_vm_ids.value | flatten) if (tf.ssh_vm_ids is defined and tf.ssh_vm_ids.value is defined) else [] }}"
     windows_vm_ids_list: "{{ (tf.windows_vm_ids.value | flatten) if (tf.windows_vm_ids is defined and tf.windows_vm_ids.value is defined) else [] }}"
 
 - name: Derive candidate count across enabled connection types
@@ -109,10 +109,25 @@
         • {{ u.username }} → connections: {{ u.allowed_connections | join(', ') }}
       {% endfor %}
 
+# ─── Wait for Guacamole to be reachable ─────────────────────────────────
+- name: Wait for Guacamole API to be available
+  ansible.builtin.uri:
+    url: "http://{{ tf.load_balancer_public_ip.value }}/guacamole/api/tokens"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      username: "{{ auth_username }}"
+      password: "{{ auth_password }}"
+    status_code: [200, 403]
+  register: _guac_wait
+  until: _guac_wait.status in [200, 403]
+  retries: 30
+  delay: 15
+
 # ─── Create connections ─────────────────────────────────────────────────
 - name: Add Guacamole VNC connections
   scicore.guacamole.guacamole_connection:
-    base_url: "http://{{ tf.bastion_public_ip.value }}/guacamole/"
+    base_url: "http://{{ tf.load_balancer_public_ip.value }}/guacamole"
     auth_username: "{{ auth_username }}"
     auth_password: "{{ auth_password }}"
     connection_name: "{{ item.name }}"
@@ -127,7 +142,7 @@
 
 - name: Add Guacamole SSH connections (with auth)
   scicore.guacamole.guacamole_connection:
-    base_url: "http://{{ tf.bastion_public_ip.value }}/guacamole/"
+    base_url: "http://{{ tf.load_balancer_public_ip.value }}/guacamole"
     auth_username: "{{ auth_username }}"
     auth_password: "{{ auth_password }}"
     connection_name: "{{ item.name }}"
@@ -144,7 +159,7 @@
 
 - name: Add Guacamole RDP connections (with auth)
   scicore.guacamole.guacamole_connection:
-    base_url: "http://{{ tf.bastion_public_ip.value }}/guacamole/"
+    base_url: "http://{{ tf.load_balancer_public_ip.value }}/guacamole"
     auth_username: "{{ auth_username }}"
     auth_password: "{{ auth_password }}"
     connection_name: "{{ item.name }}"
@@ -163,7 +178,7 @@
 # ─── Guacamole user accounts ─────────────────────────────────────────
 - name: Add Guacamole user for each entry
   scicore.guacamole.guacamole_user:
-    base_url: "http://{{ tf.bastion_public_ip.value }}/guacamole/"
+    base_url: "http://{{ tf.load_balancer_public_ip.value }}/guacamole"
     auth_username: "{{ auth_username }}"
     auth_password: "{{ auth_password }}"
     username: "{{ item.username }}"

@@ -1,16 +1,5 @@
 ---
 # ---------------------------------------------------------------------------
-# 00. Bootstrap: Load dynamic variables from Terraform
-# ---------------------------------------------------------------------------
-- name: "Bootstrap: Load dynamic inventory variables"
-  hosts: all
-  gather_facts: false
-  tasks:
-    - name: Set bastion_ip fact from Terraform output
-      set_fact:
-        bastion_ip: "{{ (lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json') | from_json).bastion_public_ip.value }}"
-
-# ---------------------------------------------------------------------------
 # 0. Kubernetes Cluster Setup
 # ---------------------------------------------------------------------------
 - name: Configure Kubernetes nodes (common)
@@ -34,15 +23,6 @@
   tags: [k8s_cluster]
   roles:
     - worker
-
-- name: Wait for Kubernetes cluster to stabilize
-  hosts: localhost
-  gather_facts: false
-  tags: [k8s_cluster]
-  tasks:
-    - name: Sleep for 120 seconds
-      ansible.builtin.pause:
-        seconds: 120
 
 # ---------------------------------------------------------------------------
 # 1. Proxmox: Configure Access on the VM

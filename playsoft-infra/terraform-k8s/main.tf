@@ -37,6 +37,7 @@ module "edge" {
   edge_private_ip      = var.edge_private_ip
   my_ip                = var.my_ip
   private_network_cidr = var.private_network_cidr
+  lb_ip                = module.k8s_lb.load_balancer_private_ip
 }
 
 module "k8s_lb" {
@@ -53,18 +54,27 @@ module "k8s_lb" {
 }
 
 
-# module "vnc_server" {
-#   count  = var.vnc_server_count
-#   source = "./modules/vnc-server"
-#   vm_id  = 201 + count.index
-#
-#   node_name   = var.node_name
-#   template_id = var.template_id
-# }
+module "vnc_server" {
+  count  = var.vnc_server_count
+  source = "./modules/vnc-server"
+  vm_id  = 801 + count.index
+
+  node_name   = var.node_name
+  template_id = var.template_id
+}
+
+module "ssh_server" {
+  count  = var.ssh_server_count
+  source = "./modules/ssh-server"
+  vm_id  = 901 + count.index
+
+  node_name   = var.node_name
+  template_id = var.template_id
+}
 
 # module "windows_vm" {
 #   source = "./modules/windows-vm"
-#
+
 #   node_name    = var.node_name
 #   template_id  = var.windows_template_id
 #   server_count = var.windows_server_count

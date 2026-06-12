@@ -44,14 +44,12 @@
   register: upload_certs_output
   when:
     - inventory_hostname == groups['k8s_master_servers'][0]
-    - not k8s_initialized.stat.exists
 
 - name: Generate join command
   ansible.builtin.command: kubeadm token create --print-join-command
   register: join_command
   when:
     - inventory_hostname == groups['k8s_master_servers'][0]
-    - not k8s_initialized.stat.exists
 
 - name: Share join commands with all hosts
   ansible.builtin.set_fact:
@@ -62,7 +60,6 @@
       --certificate-key {{ upload_certs_output.stdout_lines[-1] }}
   when:
     - inventory_hostname == groups['k8s_master_servers'][0]
-    - not k8s_initialized.stat.exists
 
 - name: Install Calico
   ansible.builtin.command: kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml

@@ -29,3 +29,8 @@ variable "private_network_cidr" {
   description = "Private network CIDR for MASQUERADE"
   type        = string
 }
+
+variable "lb_ip" {
+  description = "Private IP of the load balancer"
+  type        = string
+}

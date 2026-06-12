@@ -10,19 +10,17 @@ module "hetzner_lb" {
   server_labels             = var.server_labels
   environment               = var.environment
   delete_rebuild_protection = var.delete_rebuild_protection
-  listen_port               = 80
-  destination_port          = 30880
 }
 
 resource "hcloud_load_balancer_service" "https" {
   load_balancer_id = module.hetzner_lb.load_balancer_id
   protocol         = "tcp"
-  listen_port      = 443
-  destination_port = 30443
+  listen_port      = 480
+  destination_port = 30080
 
   health_check {
     protocol = "tcp"
-    port     = 30443
+    port     = 30080
     interval = 15
     timeout  = 10
     retries  = 3

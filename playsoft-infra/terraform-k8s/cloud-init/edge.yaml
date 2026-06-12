@@ -38,7 +38,7 @@ write_files:
         }
         
         location /guacamole/ {
-          proxy_pass http://10.20.0.10:30080/guacamole/;
+          proxy_pass http://${lb_ip}:80/guacamole/;
           proxy_http_version 1.1;
 
           proxy_set_header Upgrade \$http_upgrade;

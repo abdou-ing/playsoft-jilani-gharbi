@@ -15,7 +15,6 @@
 - name: Apply Guacamole Kubernetes manifests
   command: >
     kubectl apply
-    -n guacamole
     -f /guacamole/playsoft-jilani-gharbi/guacamole-manifest
   register: kubectl_apply
 

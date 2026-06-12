@@ -3,6 +3,11 @@
 # Shared / global variables available to all hosts
 # ──────────────────────────────────────────────
 
+_tf: "{{ lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json') | from_json }}"
+bastion_ip: "{{ _tf.bastion_public_ip.value }}"
+k8s_master_ips: "{{ _tf.k8s_master_private_ips.value }}"
+k8s_worker_ips: "{{ _tf.k8s_worker_private_ips.value }}"
+
 # Guacamole route name
 guac_route: guacamole
 
@@ -13,14 +18,14 @@ auth_password: guacadmin
 # ─────────────────────────────────────────────────────────────
 # Template config for auto-generated users.
 # ─────────────────────────────────────────────────────────────
-user_prefix: "candidat"
-user_password_prefix: "candidat"
+user_prefix: "ansible_user"
+user_password_prefix: "alphabeta123"
 user_organization: "playsoft"
-user_email_domain: "example.com"
+user_email_domain: "jilanigharbi@example.com"
 
 connection_prefix: "exam"
 vnc_hostname: "138.201.200.168"
-vnc_base_port: 5930       # port = vnc_base_port + index (1-based)
+vnc_base_port: 5950      # port = vnc_base_port + index (1-based)
 win_rdp_base_port: 3310   # port = win_rdp_base_port + index (0-based)
 ssh_base_port: 2200       # port = ssh_base_port + (vmid - 200)
 rdp_ignore_server_certs: true
@@ -34,7 +39,7 @@ win_password: "123456"
 
 connection_type:
   # - "vnc"
-   - "ssh"
+  - "ssh"
   #- "win"
 
 # ─────────────────────────────────────────────────────────────

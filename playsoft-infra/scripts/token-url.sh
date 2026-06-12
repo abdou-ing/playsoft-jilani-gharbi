@@ -19,11 +19,11 @@ get_ansible_var() {
 }
 
 # ── Load config ───────────────────────────────────────────────────────────────
-BASTION_IP=$(jq -r '.bastion_public_ip.value' "${TF_OUTPUT}")
+LB_IP=$(jq -r '.load_balancer_public_ip.value' "${TF_OUTPUT}")
 GUAC_ROUTE=$(get_ansible_var "guac_route")
 [ -z "${GUAC_ROUTE}" ] && GUAC_ROUTE="guacamole"
 
-GUAC_URL="http://${BASTION_IP}/${GUAC_ROUTE}"
+GUAC_URL="http://${LB_IP}/${GUAC_ROUTE}"
 
 ADMIN_USER=$(get_ansible_var "auth_username")
 ADMIN_PASS=$(get_ansible_var "auth_password")
@@ -45,6 +45,7 @@ IS_WIN=$(echo "${CONN_TYPES}" | grep -q "win" && echo "true" || echo "false")
 
 # ── VM counts from Terraform ──────────────────────────────────────────────────
 VNC_VM_COUNT=$(jq -r '.vnc_vm_ids.value | length' "${TF_OUTPUT}")
+SSH_VM_COUNT=$(jq -r '.ssh_vm_ids.value | length' "${TF_OUTPUT}")
 WIN_VM_COUNT=$(jq -r '.windows_vm_ids.value | length' "${TF_OUTPUT}")
 
 # ── Admin token ───────────────────────────────────────────────────────────────
@@ -105,7 +106,7 @@ if [ "${IS_VNC}" = "true" ]; then
 fi
 
 if [ "${IS_SSH}" = "true" ]; then
-  for i in $(seq 1 "${VNC_VM_COUNT}"); do
+  for i in $(seq 1 "${SSH_VM_COUNT}"); do
     NODE_NAME="${NODE_PREFIX}${i}"
     CONN_NAME="${CONN_PREFIX}-${i}-ssh"
     CID=$(get_conn_id "${CONN_NAME}")
