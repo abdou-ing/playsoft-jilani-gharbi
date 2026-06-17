@@ -1,0 +1,280 @@
+---
+# ── 0. Pre-flight ──────────────────────────────────────────────────────────────
+
+- name: Assert HCLOUD_TOKEN is set on control node
+  ansible.builtin.assert:
+    that: lookup('env', 'HCLOUD_TOKEN') != ''
+    fail_msg: "Export HCLOUD_TOKEN before running: export HCLOUD_TOKEN=<your-token>"
+
+- name: Assert WEBHOOK_SHARED_SECRET is set on control node
+  ansible.builtin.assert:
+    that: lookup('env', 'WEBHOOK_SHARED_SECRET') != ''
+    fail_msg: >-
+      Export WEBHOOK_SHARED_SECRET before running: export WEBHOOK_SHARED_SECRET=<random-value>
+      (e.g. `openssl rand -hex 32`). Without it the webhook refuses to start — anyone who could
+      reach its port would otherwise be able to trigger scale-out/scale-in unauthenticated.
+
+# ── 1. HashiCorp APT repo (required for Terraform) ────────────────────────────
+
+- name: Install prerequisites for HashiCorp repo
+  ansible.builtin.apt:
+    name: [apt-transport-https, gnupg, lsb-release, wget]
+    state: present
+    update_cache: yes
+
+- name: Download HashiCorp GPG key
+  ansible.builtin.get_url:
+    url: https://apt.releases.hashicorp.com/gpg
+    dest: /tmp/hashicorp.gpg
+    mode: '0644'
+
+- name: Dearmor HashiCorp GPG key
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg /tmp/hashicorp.gpg
+    creates: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+- name: Add HashiCorp APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com {{ ansible_lsb.codename }} main"
+    state: present
+    filename: hashicorp
+
+# ── 2. Install packages ────────────────────────────────────────────────────────
+
+- name: Install prometheus, ansible, terraform, python3
+  ansible.builtin.apt:
+    name:
+      - prometheus
+      - ansible
+      - terraform
+      - python3
+    state: present
+    update_cache: yes
+
+# ── 3. Install Alertmanager binary (not in apt) ────────────────────────────────
+
+- name: Download Alertmanager tarball
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/alertmanager/releases/download/v{{ alertmanager_version }}/alertmanager-{{ alertmanager_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/alertmanager-{{ alertmanager_version }}.tar.gz"
+    mode: '0644'
+
+- name: Extract Alertmanager
+  ansible.builtin.unarchive:
+    src: "/tmp/alertmanager-{{ alertmanager_version }}.tar.gz"
+    dest: /tmp/
+    remote_src: yes
+
+- name: Install alertmanager binary
+  ansible.builtin.copy:
+    src: "/tmp/alertmanager-{{ alertmanager_version }}.linux-amd64/alertmanager"
+    dest: /usr/local/bin/alertmanager
+    mode: '0755'
+    remote_src: yes
+
+- name: Create alertmanager data directory
+  ansible.builtin.file:
+    path: /var/lib/alertmanager/data
+    state: directory
+    mode: '0755'
+
+# ── 4. Token security ──────────────────────────────────────────────────────────
+
+- name: Create autoscaler env directory (mode 0700 — root only)
+  ansible.builtin.file:
+    path: "{{ autoscaler_env_dir }}"
+    state: directory
+    mode: '0700'
+
+- name: Create autoscaler scratch directory for tfvars/inventory temp files (mode 0700)
+  ansible.builtin.file:
+    path: "{{ autoscaler_env_dir }}/run"
+    state: directory
+    mode: '0700'
+
+- name: Write HCLOUD_TOKEN and WEBHOOK_SHARED_SECRET to env file (mode 0600)
+  ansible.builtin.copy:
+    content: |
+      HCLOUD_TOKEN={{ lookup('env', 'HCLOUD_TOKEN') }}
+      WEBHOOK_SHARED_SECRET={{ lookup('env', 'WEBHOOK_SHARED_SECRET') }}
+    dest: "{{ autoscaler_env_dir }}/env"
+    mode: '0600'
+  no_log: true
+
+# ── 5. Directory tree on bastion ───────────────────────────────────────────────
+
+- name: Create infra directory tree
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ infra_dir }}"
+    - "{{ infra_dir }}/config"
+    - "{{ infra_dir }}/webhook"
+    - "{{ infra_dir }}/ansible"
+    - "{{ infra_dir }}/terraform"
+    - "{{ infra_dir }}/terraform/env"
+    - "{{ infra_dir }}/terraform/modules"
+    - "{{ infra_dir }}/terraform/modules/k8s-worker"
+
+# ── 6. Source files ────────────────────────────────────────────────────────────
+
+- name: Copy Prometheus config files
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../prometheus/config/{{ item }}"
+    dest: "{{ infra_dir }}/config/{{ item }}"
+  loop:
+    - prometheus.yml
+    - alerts.yml
+  notify: restart prometheus
+
+- name: Create initial targets.json (skipped if file already exists)
+  ansible.builtin.copy:
+    content: "[]"
+    dest: "{{ infra_dir }}/config/targets.json"
+    force: false
+
+- name: Copy webhook.py
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../prometheus/webhook/webhook.py"
+    dest: "{{ infra_dir }}/webhook/webhook.py"
+    mode: '0755'
+  notify: restart autoscaler
+
+- name: Copy join-worker playbook
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../prometheus/ansible/join-worker.yml"
+    dest: "{{ infra_dir }}/ansible/join-worker.yml"
+
+- name: Copy Terraform root files
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../prometheus/terraform/{{ item }}"
+    dest: "{{ infra_dir }}/terraform/{{ item }}"
+  loop:
+    - main.tf
+    - variables.tf
+    - outputs.tf
+    - provider.tf
+    - .terraform.lock.hcl
+    - env/dev.tfvars
+
+- name: Copy Terraform k8s-worker module
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../prometheus/terraform/modules/k8s-worker/"
+    dest: "{{ infra_dir }}/terraform/modules/k8s-worker/"
+
+# ── 7. Terraform init (downloads providers on bastion) ─────────────────────────
+
+- name: Run terraform init
+  ansible.builtin.command:
+    cmd: terraform init -input=false
+    chdir: "{{ infra_dir }}/terraform"
+  environment:
+    HCLOUD_TOKEN: "{{ lookup('env', 'HCLOUD_TOKEN') }}"
+  register: tf_init
+  changed_when: "'Terraform has been successfully initialized' in tf_init.stdout"
+
+# ── 7b. Terraform state bootstrap (only on first deploy) ──────────────────────
+
+- name: Check if terraform state file exists
+  ansible.builtin.stat:
+    path: "{{ infra_dir }}/terraform/terraform.tfstate"
+  register: tf_state
+
+- name: Bootstrap terraform state with no autoscaler-managed workers (first deploy only)
+  ansible.builtin.command:
+    cmd: terraform apply -auto-approve -input=false -var-file=env/dev.tfvars -var='workers={}'
+    chdir: "{{ infra_dir }}/terraform"
+  environment:
+    HCLOUD_TOKEN: "{{ lookup('env', 'HCLOUD_TOKEN') }}"
+  when: not tf_state.stat.exists
+
+# ── 8. SSH key for webhook.py to reach workers/masters ────────────────────────
+
+- name: Ensure /root/.ssh exists on bastion
+  ansible.builtin.file:
+    path: /root/.ssh
+    state: directory
+    mode: '0700'
+
+- name: Ensure /root/.ansible exists on bastion (needs to be writable under ProtectHome=read-only)
+  ansible.builtin.file:
+    path: /root/.ansible
+    state: directory
+    mode: '0700'
+
+- name: Copy SSH private key to bastion
+  ansible.builtin.copy:
+    src: "{{ ssh_key_local_path }}"
+    dest: "{{ ssh_key_path }}"
+    mode: '0600'
+  no_log: true
+
+# ── 9. Template alertmanager config ───────────────────────────────────────────
+
+- name: Deploy alertmanager.yml from template
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ infra_dir }}/config/alertmanager.yml"
+    mode: '0644'
+  notify: restart alertmanager
+
+# ── 10. Systemd units ─────────────────────────────────────────────────────────
+
+- name: Create prometheus systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/prometheus.service.d
+    state: directory
+    mode: '0755'
+
+- name: Deploy prometheus systemd override (custom config path)
+  ansible.builtin.copy:
+    src: prometheus-override.conf
+    dest: /etc/systemd/system/prometheus.service.d/override.conf
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart prometheus
+
+- name: Deploy alertmanager systemd unit
+  ansible.builtin.copy:
+    src: alertmanager.service
+    dest: /etc/systemd/system/alertmanager.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart alertmanager
+
+- name: Deploy autoscaler systemd unit from template
+  ansible.builtin.template:
+    src: autoscaler.service.j2
+    dest: /etc/systemd/system/autoscaler.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart autoscaler
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+# ── 11. Enable and start all three services ────────────────────────────────────
+
+- name: Enable and start prometheus
+  ansible.builtin.systemd:
+    name: prometheus
+    state: started
+    enabled: yes
+
+- name: Enable and start alertmanager
+  ansible.builtin.systemd:
+    name: alertmanager
+    state: started
+    enabled: yes
+
+- name: Enable and start autoscaler
+  ansible.builtin.systemd:
+    name: autoscaler
+    state: started
+    enabled: yes

@@ -1,0 +1,43 @@
+[Unit]
+Description=Kubernetes Autoscaler Webhook
+After=network.target prometheus.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory={{ infra_dir }}/webhook
+ExecStart=/usr/bin/python3 {{ infra_dir }}/webhook/webhook.py
+EnvironmentFile={{ autoscaler_env_dir }}/env
+Restart=on-failure
+RestartSec=10
+
+# Hardening: this still runs as root (it needs to SSH/terraform/kubectl as root
+# against cluster nodes), but these constrain what that root process can touch
+# on the bastion itself. Does NOT replace the access controls on the webhook
+# endpoint (auth header) — defense in depth, not a substitute.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+# /root/.ansible needs to be writable — ansible-playbook (run by this service to
+# join new workers) writes local temp/control-path files under
+# /root/.ansible/tmp, which ProtectHome=read-only would otherwise block. The
+# rest of /root (including the SSH private key) stays read-only.
+ReadWritePaths={{ infra_dir }} {{ autoscaler_env_dir }} /root/.ansible
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+RemoveIPC=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

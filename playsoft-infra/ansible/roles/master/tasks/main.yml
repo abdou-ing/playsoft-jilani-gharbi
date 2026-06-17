@@ -1,3 +1,17 @@
+# ── Monitoring ───────────────────────────────────────────────────────────────
+
+- name: Install node_exporter
+  ansible.builtin.apt:
+    name: prometheus-node-exporter
+    state: present
+    update_cache: yes
+
+- name: Enable and start node_exporter
+  ansible.builtin.systemd:
+    name: prometheus-node-exporter
+    state: started
+    enabled: yes
+
 # ── Check cluster state on each node ─────────────────────────────────────────
 
 - name: Check if node is already part of the cluster

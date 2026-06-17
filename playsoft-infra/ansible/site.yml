@@ -1,6 +1,23 @@
 ---
 # ---------------------------------------------------------------------------
-# 0. Kubernetes Cluster Setup
+# 0. Prometheus Autoscaler Stack on Bastion
+# ---------------------------------------------------------------------------
+- name: Deploy Prometheus autoscaler stack on bastion
+  hosts: bastion
+  become: true
+  tags: [autoscaler]
+  roles:
+    - autoscaler
+
+- name: Deploy Grafana on bastion
+  hosts: bastion
+  become: true
+  tags: [grafana]
+  roles:
+    - grafana
+
+# ---------------------------------------------------------------------------
+# 1. Kubernetes Cluster Setup
 # ---------------------------------------------------------------------------
 - name: Configure Kubernetes nodes (common)
   hosts: k8s_nodes

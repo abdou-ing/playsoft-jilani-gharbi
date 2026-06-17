@@ -1,0 +1,14 @@
+---
+alertmanager_version: "0.27.0"
+
+infra_dir: /opt/infra/prometheus
+autoscaler_env_dir: /etc/autoscaler
+ssh_key_path: /root/.ssh/jilani
+ssh_key_local_path: "{{ lookup('env', 'HOME') }}/.ssh/jilani"
+
+# Email alerting — override in group_vars/bastion.yml or ansible-vault
+smtp_smarthost: "smtp.gmail.com:587"
+smtp_from: "gharbijilani001@gmail.com"
+smtp_auth_username: "gharbijilani001@gmail.com"
+smtp_auth_password: "eippctuerurvlqwl"
+alert_email_to: "jilanigharbi88@gmail.com"

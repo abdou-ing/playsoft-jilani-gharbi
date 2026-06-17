@@ -1,0 +1,93 @@
+---
+- name: Download Grafana GPG key
+  ansible.builtin.get_url:
+    url: https://apt.grafana.com/gpg.key
+    dest: /usr/share/keyrings/grafana.key
+    mode: '0644'
+
+- name: Add Grafana APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main"
+    state: present
+    filename: grafana
+
+- name: Install Grafana
+  ansible.builtin.apt:
+    name: grafana
+    state: present
+    update_cache: yes
+
+- name: Create Grafana provisioning directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: grafana
+    group: grafana
+  loop:
+    - /etc/grafana/provisioning/datasources
+    - /etc/grafana/provisioning/dashboards
+    - /var/lib/grafana/dashboards
+
+- name: Provision Prometheus datasource
+  ansible.builtin.copy:
+    src: grafana-datasource.yml
+    dest: /etc/grafana/provisioning/datasources/prometheus.yml
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  notify: restart grafana
+
+- name: Provision dashboard provider
+  ansible.builtin.copy:
+    src: grafana-dashboard-provider.yml
+    dest: /etc/grafana/provisioning/dashboards/provider.yml
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  notify: restart grafana
+
+- name: Fetch Node Exporter Full dashboard JSON (ID 1860) as the base for k8s-guacamole
+  ansible.builtin.uri:
+    url: https://grafana.com/api/dashboards/1860/revisions/latest/download
+    return_content: true
+  register: node_exporter_dashboard
+
+# Rename/retag the dashboard only. The Nodename variable's value list is no
+# longer queried from Prometheus at all — webhook.py now owns it directly
+# (see _update_grafana_nodename_variable), rewriting it as a static "custom"
+# variable every time targets.json changes. That sidesteps the staleness
+# problem entirely: label_values()/query_result() both ask Prometheus about
+# data over the dashboard's time range, so a destroyed node lingers in the
+# dropdown until it ages out of that range. A static list has no query to be
+# stale — it just is whatever was last written, in lockstep with reality.
+- name: Patch dashboard title/tags/uid
+  ansible.builtin.shell: |
+    python3 -c '
+    import json, sys
+    d = json.load(sys.stdin)
+    d["id"] = None
+    d["uid"] = "k8s-guacamole"
+    d["title"] = "k8s-guacamole"
+    d["tags"] = ["cluster", "guacamole", "masters", "workers"]
+    print(json.dumps(d, indent=2))
+    '
+  args:
+    stdin: "{{ node_exporter_dashboard.content }}"
+  register: patched_dashboard
+  changed_when: false
+
+- name: Write k8s-guacamole dashboard (full node monitoring for masters + workers, via Prometheus)
+  ansible.builtin.copy:
+    content: "{{ patched_dashboard.stdout }}"
+    dest: /var/lib/grafana/dashboards/k8s-guacamole.json
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  notify: restart grafana
+
+- name: Enable and start Grafana
+  ansible.builtin.systemd:
+    name: grafana-server
+    state: started
+    enabled: yes

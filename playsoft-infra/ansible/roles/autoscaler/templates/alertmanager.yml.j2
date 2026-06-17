@@ -1,0 +1,71 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: '{{ smtp_smarthost }}'
+  smtp_from: '{{ smtp_from }}'
+  smtp_auth_username: '{{ smtp_auth_username }}'
+  smtp_auth_password: '{{ smtp_auth_password }}'
+  smtp_require_tls: true
+
+route:
+  group_by: ['alertname', 'nodename']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: email
+  routes:
+    - matchers:
+        - severity="critical"
+        - action="scale-out"
+      receiver: autoscaler
+      repeat_interval: 15m
+      continue: false
+    - matchers:
+        - action="scale-in"
+      receiver: autoscaler
+      repeat_interval: 20m
+      continue: false
+
+receivers:
+  - name: email
+    email_configs:
+      - to: '{{ alert_email_to }}'
+        send_resolved: true
+        headers:
+          Subject: >-
+            {% raw %}{{ if eq .Status "firing" }}[FIRING]{{ else }}[RESOLVED]{{ end }}
+            {{ .CommonLabels.alertname }}{{ with .CommonLabels.nodename }} — {{ . }}{{ end }}
+{% endraw %}
+        html: |
+          {% raw %}{{ if eq .Status "firing" }}
+          <div style="font-family:sans-serif;border-left:4px solid #d32f2f;padding:12px;margin:8px 0">
+            <h3 style="color:#d32f2f;margin:0 0 8px 0">FIRING - {{ .CommonLabels.alertname }}</h3>
+            {{ range .Alerts }}
+            <table style="border-collapse:collapse;width:100%;margin-top:8px">
+              <tr><td style="padding:4px 8px;font-weight:bold;width:90px">Node</td><td style="padding:4px 8px">{{ .Labels.nodename }}</td></tr>
+              <tr><td style="padding:4px 8px;font-weight:bold">Severity</td><td style="padding:4px 8px">{{ .Labels.severity }}</td></tr>
+              <tr><td style="padding:4px 8px;font-weight:bold">Summary</td><td style="padding:4px 8px">{{ .Annotations.summary }}</td></tr>
+              <tr><td style="padding:4px 8px;font-weight:bold">Detail</td><td style="padding:4px 8px">{{ .Annotations.description }}</td></tr>
+              <tr><td style="padding:4px 8px;font-weight:bold">Started</td><td style="padding:4px 8px">{{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}</td></tr>
+            </table>
+            {{ end }}
+          </div>
+          {{ else }}
+          <div style="font-family:sans-serif;border-left:4px solid #388e3c;padding:12px;margin:8px 0">
+            <h3 style="color:#388e3c;margin:0 0 8px 0">RESOLVED - {{ .CommonLabels.alertname }}</h3>
+            {{ range .Alerts }}
+            <table style="border-collapse:collapse;width:100%;margin-top:8px">
+              <tr><td style="padding:4px 8px;font-weight:bold;width:90px">Node</td><td style="padding:4px 8px">{{ .Labels.nodename }}</td></tr>
+              <tr><td style="padding:4px 8px;font-weight:bold">Resolved</td><td style="padding:4px 8px">{{ .EndsAt.Format "2006-01-02 15:04:05 UTC" }}</td></tr>
+            </table>
+            {{ end }}
+          </div>
+          {{ end }}
+{% endraw %}
+
+  - name: autoscaler
+    webhook_configs:
+      - url: 'http://localhost:8080'
+        send_resolved: false
+        http_config:
+          authorization:
+            credentials: '{{ lookup("env", "WEBHOOK_SHARED_SECRET") }}'
