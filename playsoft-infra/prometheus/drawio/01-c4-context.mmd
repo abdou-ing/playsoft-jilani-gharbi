@@ -1,0 +1,23 @@
+graph TB
+    classDef user     fill:#08427b,color:#fff,stroke:#073b6f,font-weight:bold
+    classDef service  fill:#1168bd,color:#fff,stroke:#0e5ca8,font-weight:bold
+    classDef external fill:#7f8c8d,color:#fff,stroke:#616a6b
+
+    OP["Operator\n────────────\nDevOps Engineer\nLocal machine"]:::user
+
+    subgraph SYS ["Autoscaling Pipeline  [Software System]"]
+        PIPE["Bastion Host\n────────────\nPrometheus · Alertmanager\nWebhook · Terraform · Ansible\nPublic IP"]:::service
+    end
+
+    HC["Hetzner Cloud\n────────────\nCloud Provider\nVMs · Private Network\nSnapshot Images\nHetzner API"]:::external
+
+    GM["Gmail SMTP\n────────────\nsmtp.gmail.com:587\nTLS · App Password\nAlert delivery"]:::external
+
+    K8S["Kubernetes Cluster\n────────────\nPrivate network only\n10.20.0.0/24\nMaster + Workers"]:::external
+
+    OP   -->|"Deploys via Ansible\nMonitors via :9090 / :9093"| PIPE
+    PIPE -->|"Provisions / destroys worker VMs\nvia Terraform — Bearer Token"| HC
+    PIPE -->|"Sends FIRING / RESOLVED\nalert emails via STARTTLS"| GM
+    PIPE -->|"Scrapes node_exporter :9100\nJoins workers via kubeadm\nDrains nodes via kubectl"| K8S
+    HC   -->|"Hosts all compute resources"| K8S
+    GM   -->|"Delivers email to operator inbox"| OP

@@ -1,0 +1,53 @@
+graph LR
+    classDef service  fill:#1168bd,color:#fff,stroke:#0e5ca8
+    classDef config   fill:#f5a623,color:#000,stroke:#c8860c
+    classDef secret   fill:#c0392b,color:#fff,stroke:#922b21
+    classDef external fill:#7f8c8d,color:#fff,stroke:#616a6b
+
+    subgraph BASTION ["Bastion Host — /opt/infra/prometheus/"]
+
+        subgraph MON ["Monitoring Layer"]
+            PROM["Prometheus\n:9090\n/usr/bin/prometheus"]:::service
+            AM["Alertmanager\n:9093\n/usr/local/bin/alertmanager"]:::service
+        end
+
+        subgraph AUTO ["Automation Layer"]
+            WH["Autoscaler Webhook\n:8080\nwebhook.py"]:::service
+            TF["Terraform\n/opt/infra/prometheus/terraform/"]:::service
+            ANS["Ansible\njoin-worker.yml"]:::service
+        end
+
+        subgraph CFG ["Config Files"]
+            TARGETS["targets.json\ndynamic node list"]:::config
+            ALCFG["alertmanager.yml\nroutes + email"]:::config
+            PRCFG["prometheus.yml\nscrape config"]:::config
+            ALERTS["alerts.yml\n8 alert rules"]:::config
+        end
+
+        subgraph SEC ["Secret Store"]
+            ENV["/etc/autoscaler/env\nmode 0600 — root only"]:::secret
+        end
+    end
+
+    NE["node_exporter\n:9100\neach k8s node"]:::external
+    HC["Hetzner Cloud API\napi.hetzner.cloud"]:::external
+    SMTP["Gmail SMTP\nsmtp.gmail.com:587"]:::external
+    MASTER["K8s Master\n10.20.0.10"]:::external
+
+    PRCFG  -->|reads| PROM
+    ALERTS -->|loads| PROM
+    TARGETS-->|file_sd every 30s| PROM
+    ALCFG  -->|reads| AM
+
+    PROM -->|scrape :9100 every 15s| NE
+    PROM -->|POST /api/v1/alerts| AM
+    AM   -->|POST localhost:8080| WH
+    AM   -->|STARTTLS auth| SMTP
+
+    WH -->|writes| TARGETS
+    WH -->|terraform apply| TF
+    WH -->|ansible-playbook| ANS
+    WH -->|reads token| ENV
+
+    TF  -->|Bearer token| HC
+    ANS -->|SSH kubeadm join| MASTER

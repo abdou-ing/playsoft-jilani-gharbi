@@ -1,0 +1,38 @@
+graph TB
+    classDef internet fill:#e74c3c,color:#fff,stroke:#c0392b,font-weight:bold
+    classDef dmz      fill:#e67e22,color:#fff,stroke:#ca6f1e,font-weight:bold
+    classDef private  fill:#27ae60,color:#fff,stroke:#1e8449,font-weight:bold
+    classDef extapi   fill:#8e44ad,color:#fff,stroke:#76359d,font-weight:bold
+    classDef config   fill:#ecf0f1,color:#333,stroke:#bdc3c7
+
+    subgraph INET ["ZONE 1 — Internet (Untrusted)"]
+        OP["Operator\nLocal Machine\nDynamic IP"]:::internet
+        SMTP["Gmail SMTP\nsmtp.gmail.com:587"]:::internet
+    end
+
+    subgraph DMZ ["ZONE 2 — DMZ (Bastion — Semi-Trusted)"]
+        BASTION["Bastion Host\nPUBLIC_IP\n────────────────\nPrometheus  :9090\nAlertmanager :9093\nWebhook :8080 localhost only"]:::dmz
+        FW["Firewall Rules\n────────────────\nIN  22   SSH key-only\nIN  9090 Prometheus UI\nIN  9093 Alertmanager UI\nDENY 8080 from internet\nOUT 443  Hetzner API\nOUT 587  SMTP"]:::config
+    end
+
+    subgraph PRIV ["ZONE 3 — Private Network (Trusted) 10.20.0.0/24"]
+        MASTER["K8s Master\n10.20.0.10\n────────────\nkubeadm :6443\nnode_exporter :9100"]:::private
+        W1["Worker 1\n10.20.0.11\n────────────\nnode_exporter :9100\nkubelet"]:::private
+        WN["Worker N\n10.20.0.11+N\n────────────\nnode_exporter :9100\nkubelet"]:::private
+    end
+
+    subgraph EXTAPI ["ZONE 4 — External APIs (Trusted with Token)"]
+        HC["Hetzner Cloud API\napi.hetzner.cloud:443\nHTTPS Bearer Token"]:::extapi
+    end
+
+    OP      -->|"SSH :22 key auth only"| BASTION
+    OP      -->|"HTTP :9090 Prometheus UI"| BASTION
+    OP      -->|"HTTP :9093 Alertmanager UI"| BASTION
+    BASTION -->|"scrape :9100 private network"| MASTER
+    BASTION -->|"scrape :9100 private network"| W1
+    BASTION -->|"scrape :9100 private network"| WN
+    BASTION -->|"SSH :22 kubeadm join / kubectl"| MASTER
+    BASTION -->|"HTTPS :443 Bearer HCLOUD_TOKEN"| HC
+    BASTION -->|"STARTTLS :587 App Password"| SMTP
+    HC      -->|"provision / destroy VMs"| WN
+    SMTP    -->|"alert email delivery"| OP
