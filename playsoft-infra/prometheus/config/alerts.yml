@@ -6,35 +6,60 @@ groups:
         for: 2m
         labels:
           severity: warning
-          team: infra
+          team: Cloud DevSecOps
         annotations:
           summary: "High CPU — {{ $labels.nodename }}"
           description: "CPU usage is {{ $value | printf \"%.1f\" }}% (threshold: 70%) on node {{ $labels.nodename }} ({{ $labels.instance }}). Sustained high load may trigger auto scale-out."
 
-      - alert: NodeCPUCritical
-        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 85
+      - alert: WorkerAvgCPUCritical
+        # Averaged across worker nodes only — masters never factor into the
+        # scale-out decision (scaling out workers doesn't relieve control-plane
+        # load, and a single busy master shouldn't provision a worker it doesn't need).
+        expr: |
+          avg(100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle", job="k8s-nodes", nodename=~"hzn-k8s-worker-[0-9]+-dev"}[2m])) * 100)) > 85
         for: 2m
         labels:
           severity: critical
           action: scale-out
-          team: infra
+          team: Cloud DevSecOps
         annotations:
-          summary: "CPU Saturation — {{ $labels.nodename }} → Scale-Out Triggered"
-          description: "CPU usage is {{ $value | printf \"%.1f\" }}% (threshold: 85%) on node {{ $labels.nodename }} ({{ $labels.instance }}). A new worker node is being provisioned automatically."
+          summary: "Average worker CPU saturation → Scale-Out Triggered"
+          description: "Average CPU usage across all worker nodes has been {{ $value | printf \"%.1f\" }}% (threshold: 85%) for 2 minutes. A new worker node is being provisioned automatically."
 
   - name: node.scaledown
     rules:
-      - alert: NodeCPULow
+      - alert: WorkerAvgCPULow
+        # Same worker-only scope as WorkerAvgCPUCritical — previously this
+        # averaged across ALL nodes including masters, so an idle/busy master
+        # could skew a scale-in decision that should only be about worker load.
         expr: |
-          avg(100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle",job="k8s-nodes"}[5m])) * 100)) < 20
+          avg(100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle", job="k8s-nodes", nodename=~"hzn-k8s-worker-[0-9]+-dev"}[5m])) * 100)) < 20
         for: 10m
         labels:
           severity: info
           action: scale-in
-          team: infra
+          team: Cloud DevSecOps
         annotations:
-          summary: "Low Cluster CPU — Scale-In Triggered"
-          description: "Average cluster CPU has been {{ $value | printf \"%.1f\" }}% (threshold: <20%) for 10 minutes. The last worker node will be removed to reduce costs."
+          summary: "Low Average Worker CPU — Scale-In Triggered"
+          description: "Average CPU across all worker nodes has been {{ $value | printf \"%.1f\" }}% (threshold: <20%) for 10 minutes. The last autoscaler-managed worker will be removed to reduce costs."
+
+  - name: node.masterhealth
+    rules:
+      - alert: MasterAvgCPUWarning
+        # Visibility only — no `action` label, so this routes to email, never
+        # to the autoscaler webhook. Masters aren't scaled in this architecture;
+        # this exists because both control-plane nodes' load matters together,
+        # not just whichever one happens to be lowest-IP (the one used for
+        # kubectl/join orchestration — see AUTOSCALER.md §4 for that SPOF).
+        expr: |
+          avg(100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle", job="k8s-nodes", nodename=~"hzn-k8s-master-[0-9]+-dev"}[5m])) * 100)) > 70
+        for: 5m
+        labels:
+          severity: warning
+          team: Cloud DevSecOps
+        annotations:
+          summary: "High average control-plane CPU"
+          description: "Average CPU across both masters has been {{ $value | printf \"%.1f\" }}% (threshold: 70%) for 5 minutes."
 
   - name: node.availability
     rules:
@@ -43,7 +68,7 @@ groups:
         for: 1m
         labels:
           severity: critical
-          team: infra
+          team: Cloud DevSecOps
         annotations:
           summary: "Node Unreachable — {{ $labels.nodename }}"
           description: "Node {{ $labels.nodename }} ({{ $labels.instance }}) has been unreachable for more than 1 minute. node_exporter is not responding. Immediate investigation required."
@@ -56,7 +81,7 @@ groups:
         for: 2m
         labels:
           severity: warning
-          team: infra
+          team: Cloud DevSecOps
         annotations:
           summary: "High Memory — {{ $labels.nodename }}"
           description: "Memory usage is {{ $value | printf \"%.1f\" }}% (threshold: 80%) on node {{ $labels.nodename }} ({{ $labels.instance }}). Available: {{ with query \"node_memory_MemAvailable_bytes{instance='\" }}{{ . | first | value | humanize }}{{ end }}."
@@ -67,7 +92,7 @@ groups:
         for: 2m
         labels:
           severity: critical
-          team: infra
+          team: Cloud DevSecOps
         annotations:
           summary: "Critical Memory — {{ $labels.nodename }}"
           description: "Memory usage is {{ $value | printf \"%.1f\" }}% (threshold: 90%) on node {{ $labels.nodename }} ({{ $labels.instance }}). OOM risk — immediate action required."
@@ -80,7 +105,7 @@ groups:
         for: 5m
         labels:
           severity: warning
-          team: infra
+          team: Cloud DevSecOps
         annotations:
           summary: "Disk Filling — {{ $labels.nodename }}"
           description: "Disk usage on / is {{ $value | printf \"%.1f\" }}% (threshold: 75%) on node {{ $labels.nodename }} ({{ $labels.instance }}). Plan cleanup or expansion soon."
@@ -91,7 +116,7 @@ groups:
         for: 5m
         labels:
           severity: critical
-          team: infra
+          team: Cloud DevSecOps
         annotations:
           summary: "Disk Almost Full — {{ $labels.nodename }}"
           description: "Disk usage on / is {{ $value | printf \"%.1f\" }}% (threshold: 90%) on node {{ $labels.nodename }} ({{ $labels.instance }}). Immediate cleanup required — services may fail."

@@ -22,7 +22,12 @@ ProtectHome=read-only
 # join new workers) writes local temp/control-path files under
 # /root/.ansible/tmp, which ProtectHome=read-only would otherwise block. The
 # rest of /root (including the SSH private key) stays read-only.
-ReadWritePaths={{ infra_dir }} {{ autoscaler_env_dir }} /root/.ansible
+# /var/lib/grafana/dashboards needs to be writable too — _update_grafana_nodename_variable()
+# in webhook.py rewrites k8s-guacamole.json in place on every targets.json sync;
+# ProtectSystem=strict otherwise makes the whole filesystem read-only outside
+# this list, which is exactly what broke that sync (Errno 30 on the dashboard's
+# temp file) until this line was added.
+ReadWritePaths={{ infra_dir }} {{ autoscaler_env_dir }} /root/.ansible /var/lib/grafana/dashboards
 PrivateTmp=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
@@ -34,7 +39,15 @@ RestrictSUIDSGID=true
 RestrictRealtime=true
 LockPersonality=true
 RemoveIPC=true
-CapabilityBoundingSet=
+# CAP_DAC_OVERRIDE: needed because this service writes into
+# /var/lib/grafana/dashboards, which is owned by the grafana user/group (0755) —
+# without this, root only gets "other" permissions there (r-x, no write), since
+# dropping all capabilities makes UID 0 subject to normal Unix permission checks
+# just like any other user for files it doesn't own. Everything else this
+# service writes to (infra_dir, autoscaler_env_dir, /root/.ansible) is root-owned,
+# where owner permission bits already grant access with no capability needed —
+# this is the one path that crosses an ownership boundary.
+CapabilityBoundingSet=CAP_DAC_OVERRIDE
 AmbientCapabilities=
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 SystemCallFilter=@system-service

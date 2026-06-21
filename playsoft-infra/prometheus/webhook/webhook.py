@@ -445,7 +445,24 @@ def scale_in():
     except subprocess.TimeoutExpired:
         logging.warning("kubectl delete node timed out after %ds — continuing, terraform will still destroy the VM", KUBECTL_TIMEOUT)
 
-    # Step 4: terraform apply with the worker removed from the managed map —
+    # Step 4: kubeadm reset on the worker itself — undoes kubeadm's changes
+    # (stops kubelet, clears CNI/iptables rules, removes /etc/kubernetes) before
+    # the VM is destroyed. Best-effort: the VM is gone seconds later regardless,
+    # so a failure here (including the node already being unreachable, which is
+    # plausible if it's being removed because it's unhealthy) must never block
+    # the actual scale-in.
+    worker_ssh = ["ssh", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no",
+                  "-o", "ConnectTimeout=10", f"root@{remove_ip}"]
+    try:
+        r = subprocess.run(worker_ssh + ["kubeadm reset -f"], capture_output=True, text=True, timeout=KUBECTL_TIMEOUT)
+        if r.returncode != 0:
+            logging.warning("kubeadm reset on %s exited %d (continuing — VM is being destroyed regardless): %s",
+                             remove_name, r.returncode, r.stderr[-300:])
+    except subprocess.TimeoutExpired:
+        logging.warning("kubeadm reset on %s timed out after %ds (continuing — VM is being destroyed regardless)",
+                         remove_name, KUBECTL_TIMEOUT)
+
+    # Step 5: terraform apply with the worker removed from the managed map —
     # terraform diffs this against state and destroys just that one VM.
     new_managed = {n: ip for n, ip in managed.items() if n != remove_name}
     if not apply_workers(new_managed):

@@ -26,8 +26,9 @@ real CPU load, with zero manual intervention, while guaranteeing:
 
 | | |
 |---|---|
-| Trigger (scale-out) | `NodeCPUCritical`: per-node CPU >85%, sustained 2m |
-| Trigger (scale-in) | `NodeCPULow`: cluster-average CPU <20%, sustained 10m |
+| Trigger (scale-out) | `WorkerAvgCPUCritical`: average CPU **across worker nodes only** >85%, sustained 2m |
+| Trigger (scale-in) | `WorkerAvgCPULow`: average CPU **across worker nodes only** <20%, sustained 10m |
+| Control-plane visibility (not a scaling trigger) | `MasterAvgCPUWarning`: average CPU across both masters >70%, sustained 5m — email only, masters aren't autoscaled |
 | Cooldown | 600s between any two scale operations (either direction), enforced by one non-blocking lock that also prevents two scale operations running concurrently |
 | New worker specs | `cx23`, golden snapshot image (`created_by=jilani,role=k8s_master_and_worker`), private network only (no public IP) |
 | Naming / IP | `hzn-k8s-worker-N-dev`, `10.20.0.20+`, computed fresh from a live Hetzner API query every time — never a hardcoded offset |
