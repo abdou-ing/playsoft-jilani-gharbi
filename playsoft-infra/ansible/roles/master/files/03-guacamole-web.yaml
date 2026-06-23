@@ -17,33 +17,124 @@ spec:
       timeoutSeconds: 10800
 
 ---
+# What it does: Tells Kubernetes "never take down more than 1
+# guacamole pod at a time." Whether it's a node drain,
+# descheduler, or rolling update — only 1 pod is ever disrupted
+# while the rest stay alive.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: guacamole-web-pdb
+  namespace: guacamole
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: guacamole-web
+
+---
+# 3. DEPLOYMENT
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: guacamole-web
   namespace: guacamole
 spec:
+
+  # What it does: replicas: 3 starts with 1 pod per node.
+  # revisionHistoryLimit: 3 keeps only last 3 deployment versions
+  # saved — prevents etcd bloat. HPA takes over after first deploy.
+  replicas: 3
+  revisionHistoryLimit: 3
+
+  # What it does: During a deploy, Kubernetes spins up 1 new pod
+  # first, waits until Ready, then kills the old one.
+  # maxUnavailable: 0 means zero pods are ever down during update
+  # — users never notice a deployment.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+
   selector:
     matchLabels:
       app: guacamole-web
+
   template:
     metadata:
       labels:
         app: guacamole-web
     spec:
+
+      # What it does: Gives the pod 40 seconds to shut down cleanly
+      # before Kubernetes force-kills it. Must be higher than
+      # preStop sleep (10s) + app shutdown time. Without this,
+      # Kubernetes could kill the pod before it finishes shutting down.
+      terminationGracePeriodSeconds: 40
+
+      # What it does: Tells the scheduler "the difference between
+      # the most loaded node and least loaded node can never exceed
+      # 1 pod." If placing a pod would break this rule, it stays
+      # Pending until a valid node is available.
+      # This is the LAW of even distribution.
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: DoNotSchedule
+          whenUnsatisfiable: ScheduleAnyway  
           labelSelector:
             matchLabels:
               app: guacamole-web
+
+      # What it does: Tells the scheduler "try hard to avoid placing
+      # 2 guacamole pods on the same node." This is the SOFT HINT
+      # on top of the hard law above. preferred (not required) means
+      # if there is truly no other node, it will still schedule
+      # — won't leave pods Pending forever.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: guacamole-web
+                topologyKey: kubernetes.io/hostname
+
       containers:
       - name: guacamole-web
         image: jilanigh/guacamole:redis-v1
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /guacamole
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          failureThreshold: 3
+        # What it does: Tells Kubernetes "if this pod stops answering,
+        # kill it and restart it." Catches "zombie" pods that appear
+        # Running but are internally deadlocked. initialDelaySeconds: 30
+        # must be higher than readiness — don't kill a pod still booting.
+        livenessProbe:
+          httpGet:
+            path: /guacamole
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 3
+
+        # What it does: Before the pod is killed, wait 10 seconds first.
+        # Gives active RDP/SSH sessions time to disconnect cleanly.
+        # Without this, users get a hard cut mid-session the moment
+        # a pod is evicted.
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sleep", "10"]
+
         env:
         - name: GUACD_HOSTNAME
           value: "guacd"
@@ -68,9 +159,6 @@ spec:
               key: postgres-password
         - name: POSTGRESQL_ENABLED
           value: "true"
-        # ── Redis session store ──────────────────────────────
-        # These env vars are read by our custom HashTokenSessionMap.
-        # REDIS_HOSTNAME must match the Service name in 05-redis.yaml.
         - name: REDIS_HOSTNAME
           value: "redis"
         - name: REDIS_PORT
@@ -86,7 +174,8 @@ spec:
             memory: 256Mi
           limits:
             cpu: 500m
-            memory: 512Mi
+            memory: 768Mi
+
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -107,3 +196,16 @@ spec:
       target:
         type: Utilization
         averageUtilization: 70
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 300
