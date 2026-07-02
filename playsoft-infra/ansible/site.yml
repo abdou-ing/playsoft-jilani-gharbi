@@ -42,6 +42,33 @@
     - worker
 
 # ---------------------------------------------------------------------------
+# 1b. Vault <-> Kubernetes integration (opt-in: --tags k8s_vault)
+#     Adds the LB IP to the apiserver certSANs, regenerates the apiserver
+#     cert one master at a time, then writes the Vault kubernetes-auth
+#     config/role. Never runs as part of a normal site.yml pass.
+# ---------------------------------------------------------------------------
+- name: Wire up Vault kubernetes-auth certs on each master
+  hosts: k8s_master_servers
+  become: true
+  serial: 1
+  tags: [k8s_vault]
+  tasks:
+    - name: Run k8s-vault certs tasks
+      ansible.builtin.include_role:
+        name: k8s-vault
+        tasks_from: certs.yml
+
+- name: Configure Vault kubernetes-auth method + role
+  hosts: localhost
+  become: false
+  tags: [k8s_vault]
+  tasks:
+    - name: Run k8s-vault vault_config tasks
+      ansible.builtin.include_role:
+        name: k8s-vault
+        tasks_from: vault_config.yml
+
+# ---------------------------------------------------------------------------
 # 1. Proxmox: Configure Access on the VM
 # ---------------------------------------------------------------------------
 - name: Configure Access on Proxmox

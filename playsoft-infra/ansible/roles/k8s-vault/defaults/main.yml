@@ -1,0 +1,18 @@
+---
+# Opt-in role: only ever runs when invoked with --tags k8s_vault.
+# Wires the cluster's kube-apiserver up so Vault (external, reached via the
+# LB) can do Kubernetes-auth TokenReview calls against it, then writes the
+# matching auth/<mount>/config + role into Vault.
+
+vault_addr: "https://vault.dev.playsoft.io:8200"
+vault_k8s_auth_mount: "k8s-dev-jilani"
+vault_k8s_role_name: "guacamole-k8s"
+vault_k8s_policy_name: "jilani_policy"
+
+vault_auth_delegator_namespace: "vault"
+vault_auth_delegator_secret: "vault-auth-delegator-token"
+
+# Reuses the existing Terraform output already wired into group_vars/all.yml
+k8s_lb_ip: "{{ k8s_lb_public_ip }}"
+
+kubeadm_certsans_backup_dir: "/root/pki-backup"

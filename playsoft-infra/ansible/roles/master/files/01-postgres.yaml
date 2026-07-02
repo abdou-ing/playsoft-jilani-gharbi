@@ -1,20 +1,4 @@
-#HostPath PersistentVolume (local server storage)
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: postgres-pv
-spec:
-  capacity:
-    storage: 5Gi
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: manual
-  hostPath:
-    path: /data/postgres    # local folder on our server where data will be stored
-    type: DirectoryOrCreate
-
----
-# PVC that PostgreSQL will use
+# PVC that PostgreSQL will use — Longhorn replicates this across both workers
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -23,22 +7,13 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: manual
+  storageClassName: longhorn-2rep
   resources:
     requests:
       storage: 5Gi
 
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: postgres-secret
-  namespace: guacamole
-type: Opaque
-stringData:
-  postgres-user: guacuser
-  postgres-password: guacpass
-  postgres-db: guacdb
+# postgres-secret is no longer defined here — it's materialized by the
+# ExternalSecret in 07-vault-secrets.yaml, sourced from Vault (kv-dev/jilani/k8s).
 
 ---
 apiVersion: v1
@@ -74,6 +49,8 @@ spec:
         ports:
           - containerPort: 5432
         env:
+          - name: PGDATA
+            value: /var/lib/postgresql/data/pgdata
           - name: POSTGRES_USER
             valueFrom:
               secretKeyRef:

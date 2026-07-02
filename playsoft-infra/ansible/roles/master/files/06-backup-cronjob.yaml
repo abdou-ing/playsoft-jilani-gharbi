@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: guacamole
+spec:
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          volumes:
+            - name: mc-bin
+              emptyDir: {}
+          initContainers:
+            - name: fetch-mc
+              image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+              command: ["/bin/sh", "-c", "cp /usr/bin/mc /mc-bin/mc && cp /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /mc-bin/ca-bundle.pem"]
+              volumeMounts:
+                - name: mc-bin
+                  mountPath: /mc-bin
+          containers:
+            - name: pg-backup
+              image: postgres:15.3
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+                  TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
+                  FILENAME="guacdb-${TIMESTAMP}.sql.gz"
+                  PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+                    | gzip > "/tmp/${FILENAME}"
+                  /mc-bin/mc alias set backup-target "$S3_ENDPOINT" "$S3_ACCESS_KEY" "$S3_SECRET_KEY"
+                  /mc-bin/mc cp "/tmp/${FILENAME}" "backup-target/guacamole-backup-dev/${FILENAME}"
+                  echo "Uploaded ${FILENAME}"
+              volumeMounts:
+                - name: mc-bin
+                  mountPath: /mc-bin
+              env:
+                - name: SSL_CERT_FILE
+                  value: /mc-bin/ca-bundle.pem
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef: {name: postgres-secret, key: postgres-user}
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef: {name: postgres-secret, key: postgres-password}
+                - name: POSTGRES_DB
+                  valueFrom:
+                    secretKeyRef: {name: postgres-secret, key: postgres-db}
+                - name: S3_ENDPOINT
+                  valueFrom:
+                    secretKeyRef: {name: backup-s3-secret, key: endpoint}
+                - name: S3_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef: {name: backup-s3-secret, key: access-key}
+                - name: S3_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef: {name: backup-s3-secret, key: secret-key}

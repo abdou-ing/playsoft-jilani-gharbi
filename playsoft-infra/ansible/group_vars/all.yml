@@ -7,6 +7,7 @@ _tf: "{{ lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terr
 bastion_ip: "{{ _tf.bastion_public_ip.value }}"
 k8s_master_ips: "{{ _tf.k8s_master_private_ips.value }}"
 k8s_worker_ips: "{{ _tf.k8s_worker_private_ips.value }}"
+k8s_lb_public_ip: "{{ _tf.load_balancer_public_ip.value }}"
 
 # Guacamole route name
 guac_route: guacamole

@@ -1,0 +1,117 @@
+---
+# Run on every host in k8s_master_servers (site.yml uses serial: 1 so this
+# happens one master at a time, never taking the whole control plane down).
+#
+# Adds the LB's IP to the apiserver's certSANs so Vault's TLS handshake
+# (going through the LB) succeeds, then regenerates just the apiserver
+# cert/key and forces the kubelet to recreate the static pod with it.
+#
+# Every state-changing step below is guarded by a "does this already exist /
+# already have the IP" check — if everything's already in place, this whole
+# file is a no-op read-only pass: nothing is patched, backed up, regenerated,
+# or restarted.
+
+- name: Pull live kubeadm ClusterConfiguration (only needs doing once)
+  ansible.builtin.command:
+    cmd: kubectl -n kube-system get configmap kubeadm-config -o jsonpath='{.data.ClusterConfiguration}'
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: kubeadm_live_config
+  changed_when: false
+  run_once: true
+
+- name: Parse it
+  ansible.builtin.set_fact:
+    kubeadm_live_config_parsed: "{{ kubeadm_live_config.stdout | from_yaml }}"
+  run_once: true
+
+- name: Check whether the kubeadm-config ConfigMap already has the LB IP
+  ansible.builtin.set_fact:
+    configmap_needs_patch: "{{ k8s_lb_ip not in (kubeadm_live_config_parsed.apiServer.certSANs | default([])) }}"
+  run_once: true
+
+- name: Check whether this master's apiserver cert already has the LB IP
+  ansible.builtin.command:
+    cmd: openssl x509 -in /etc/kubernetes/pki/apiserver.crt -noout -text
+  register: apiserver_cert_text
+  changed_when: false
+
+- name: Record whether this master's cert needs regenerating
+  ansible.builtin.set_fact:
+    cert_needs_regen: "{{ k8s_lb_ip not in apiserver_cert_text.stdout }}"
+
+- name: Nothing to do on this master — LB IP already present everywhere
+  ansible.builtin.debug:
+    msg: "ConfigMap and apiserver cert already include {{ k8s_lb_ip }} — skipping all changes."
+  when: not configmap_needs_patch and not cert_needs_regen
+
+- name: Build the updated ClusterConfiguration with the LB IP appended
+  ansible.builtin.set_fact:
+    kubeadm_live_config_updated: "{{ kubeadm_live_config_parsed | combine({
+        'apiServer': kubeadm_live_config_parsed.apiServer | default({}) | combine({
+          'certSANs': (kubeadm_live_config_parsed.apiServer.certSANs | default([]) + [k8s_lb_ip]) | unique
+        })
+      }, recursive=True) }}"
+  when: configmap_needs_patch or cert_needs_regen
+
+- name: Write the updated ClusterConfiguration to disk
+  ansible.builtin.copy:
+    content: "{{ kubeadm_live_config_updated | to_nice_yaml }}"
+    dest: /tmp/kubeadm-live.yaml
+    mode: "0600"
+  when: configmap_needs_patch or cert_needs_regen
+
+- name: Patch the kubeadm-config ConfigMap with the new certSANs (cluster-wide, do once)
+  ansible.builtin.shell: |
+    set -o pipefail
+    kubectl -n kube-system create configmap kubeadm-config \
+      --from-file=ClusterConfiguration=/tmp/kubeadm-live.yaml \
+      --dry-run=client -o yaml | kubectl apply -f -
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  run_once: true
+  when: configmap_needs_patch
+
+- name: Back up and regenerate the apiserver cert (only if the LB IP is missing)
+  when: cert_needs_regen
+  block:
+    - name: Ensure the cert backup directory exists
+      ansible.builtin.file:
+        path: "{{ kubeadm_certsans_backup_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Back up the current apiserver cert/key
+      ansible.builtin.command:
+        cmd: "mv /etc/kubernetes/pki/apiserver.{{ item }} {{ kubeadm_certsans_backup_dir }}/apiserver.{{ item }}.{{ ansible_date_time.epoch }}"
+      loop:
+        - crt
+        - key
+
+    - name: Regenerate the apiserver cert with the updated certSANs
+      ansible.builtin.command:
+        cmd: kubeadm init phase certs apiserver --config /tmp/kubeadm-live.yaml
+
+    - name: Find the kube-apiserver pod sandbox on this node
+      ansible.builtin.command:
+        cmd: crictl pods --name kube-apiserver -q
+      register: apiserver_sandbox
+      changed_when: false
+
+    - name: Force the kubelet to recreate the apiserver static pod with the new cert
+      ansible.builtin.command:
+        cmd: "crictl stopp {{ apiserver_sandbox.stdout_lines[0] }}"
+      when: apiserver_sandbox.stdout_lines | length > 0
+
+    - name: Wait for this master's apiserver to come back healthy before moving to the next master
+      ansible.builtin.uri:
+        url: "https://127.0.0.1:6443/healthz"
+        validate_certs: false
+        status_code: 200
+      register: apiserver_health
+      until: apiserver_health.status == 200
+      retries: 30
+      delay: 5
+      changed_when: false

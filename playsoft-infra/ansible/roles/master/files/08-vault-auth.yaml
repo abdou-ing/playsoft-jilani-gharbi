@@ -1,0 +1,36 @@
+# One-time bootstrap identity Vault uses to call the cluster's TokenReview
+# API when validating logins from workload ServiceAccounts (e.g.
+# guacamole-vault in 07-vault-secrets.yaml). Not a per-app credential.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-auth-delegator
+  namespace: vault
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vault-auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: vault-auth-delegator
+    namespace: vault
+
+---
+# K8s 1.24+ no longer auto-creates a Secret for a ServiceAccount, so this is
+# requested explicitly to get a long-lived, non-expiring JWT for Vault's
+# kubernetes auth config (a short-lived projected token would expire and
+# break Vault's ability to validate logins).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-auth-delegator-token
+  namespace: vault
+  annotations:
+    kubernetes.io/service-account.name: vault-auth-delegator
+type: kubernetes.io/service-account-token
