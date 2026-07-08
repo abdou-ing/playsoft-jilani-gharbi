@@ -14,6 +14,7 @@ if [ ! -f "${TF_OUTPUT}" ]; then
 fi
 
 BASTION_IP=$(jq -r '.bastion_public_ip.value' "${TF_OUTPUT}")
+MONITORING_IP=$(jq -r '.monitoring_public_ip.value' "${TF_OUTPUT}")
 MASTER_COUNT=$(jq -r '.k8s_master_private_ips.value | length' "${TF_OUTPUT}")
 WORKER_COUNT=$(jq -r '.k8s_worker_private_ips.value | length' "${TF_OUTPUT}")
 
@@ -27,8 +28,14 @@ WORKER_COUNT=$(jq -r '.k8s_worker_private_ips.value | length' "${TF_OUTPUT}")
   echo "[bastion:vars]"
   echo "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
   echo ""
+  echo "[monitoring]"
+  echo "monitoring ansible_host=${MONITORING_IP} ansible_user=root ansible_ssh_private_key_file=/home/jilani/.ssh/jilani"
+  echo ""
+  echo "[monitoring:vars]"
+  echo "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
+  echo ""
   echo "[proxmox]"
-  echo "playsoft-proxmox ansible_host=138.201.200.168 ansible_user=abdou ansible_ssh_private_key_file=/home/jilani/.ssh/jilani"
+  echo "playsoft-proxmox ansible_host=<PROXMOX_HOST> ansible_user=<SERVER_USER> ansible_ssh_private_key_file=/home/jilani/.ssh/jilani"
   echo ""
   echo "[k8s_master_servers]"
   for i in $(seq 0 $((MASTER_COUNT - 1))); do
@@ -51,4 +58,4 @@ WORKER_COUNT=$(jq -r '.k8s_worker_private_ips.value | length' "${TF_OUTPUT}")
   echo "ansible_ssh_common_args='-o ProxyCommand=\"ssh -i /home/jilani/.ssh/jilani -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -l root ${BASTION_IP} -W %h:%p\"'"
 } > "${INVENTORY}"
 
-echo "✅ Inventory generated: ${MASTER_COUNT} master(s), ${WORKER_COUNT} worker(s), bastion=${BASTION_IP}"
+echo "Inventory generated: ${MASTER_COUNT} master(s), ${WORKER_COUNT} worker(s), bastion=${BASTION_IP}, monitoring=${MONITORING_IP}"

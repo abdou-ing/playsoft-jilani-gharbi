@@ -10,6 +10,14 @@ output "bastion_public_ip" {
   value = module.edge.public_ip
 }
 
+output "monitoring_public_ip" {
+  value = module.monitoring.public_ip
+}
+
+output "monitoring_private_ip" {
+  value = module.monitoring.private_ip
+}
+
 output "load_balancer_public_ip" {
   value       = module.k8s_lb.load_balancer_ipv4
   description = "Public IP of the Kubernetes load balancer"

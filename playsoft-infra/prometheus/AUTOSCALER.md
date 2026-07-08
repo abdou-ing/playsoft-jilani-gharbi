@@ -140,9 +140,12 @@ Listed roughly in the order they were found.
 - `controlPlaneEndpoint` is hardcoded to master-1's IP at cluster-init time —
   master-2 provides etcd/control-plane redundancy but isn't an active fallback;
   if master-1 goes down, no node (old or new) can join or re-register.
-- `smtp_auth_password` is still hardcoded in plaintext in
-  `ansible/roles/autoscaler/vars/main.yml`, already committed to git history —
-  needs rotation and a move to vault/env, independent of everything above.
+- `smtp_auth_password` was hardcoded in plaintext in
+  `ansible/roles/autoscaler/vars/main.yml` and committed to git history; the
+  role now reads it from a required `SMTP_AUTH_PASSWORD` env var instead (see
+  §5), but the old value is still recoverable from git history and needs to
+  be rotated (revoke the Gmail app password, issue a new one) independent of
+  the code fix.
 - SSH host-key checking is disabled (`StrictHostKeyChecking=no`) for
   bastion-to-node connections — accepted trade-off for a private network of
   ephemeral, frequently-recycled nodes; host-key pinning would need to handle
@@ -151,11 +154,13 @@ Listed roughly in the order they were found.
 ## 5. Email alerting
 
 Alertmanager has two receivers: `autoscaler` (the webhook — covered above) and
-`email`, configured via SMTP in `ansible/roles/autoscaler/vars/main.yml`
-(`smtp_smarthost`, `smtp_from`, `smtp_auth_username`, `smtp_auth_password`,
-`alert_email_to`). Those values are credentials — never paste the real ones into
-docs, tickets, or chat; they belong in the vars file (and per §4, that file should
-move to vault — it currently isn't).
+`email`, configured via SMTP. Non-secret settings (`smtp_smarthost`, `smtp_from`,
+`smtp_auth_username`, `alert_email_to`) live in
+`ansible/roles/autoscaler/vars/main.yml`. `smtp_auth_password` is deliberately
+not there — export `SMTP_AUTH_PASSWORD` on the control node before running the
+role (same pattern as `HCLOUD_TOKEN`/`WEBHOOK_SHARED_SECRET`); the role asserts
+it's set and `alertmanager.yml.j2` reads it straight from the environment, so
+it never lands in a committed file.
 
 Routing logic (`alertmanager.yml.j2`):
 - Alerts labeled `action: scale-out` or `action: scale-in` go **only** to the

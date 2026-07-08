@@ -2,6 +2,35 @@ variable "location" {
   default = "fsn1"
 }
 
+variable "master_location" {
+  description = "Hetzner location for k8s master nodes"
+  type        = string
+  default     = "fsn1"
+}
+
+variable "worker_location" {
+  description = "Hetzner location for k8s worker nodes"
+  type        = string
+  default     = "fsn1"
+}
+
+variable "monitoring_location" {
+  description = "Hetzner location for the Grafana/Prometheus monitoring server"
+  type        = string
+  default     = "fsn1"
+}
+
+variable "monitoring_server_type" {
+  type    = string
+  default = "cx22"
+}
+
+variable "monitoring_private_ip" {
+  description = "Private IP of the monitoring server (Grafana/Prometheus)"
+  type        = string
+  default     = "10.20.0.5"
+}
+
 variable "server_type" {
   default = "cx33"
 }

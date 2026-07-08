@@ -23,7 +23,13 @@ SCRATCH_DIR        = "/etc/autoscaler/run"   # 0700, root-only — avoids the sh
 ANSIBLE_DIR        = "/opt/infra/prometheus/ansible"
 JOIN_PLAYBOOK      = f"{ANSIBLE_DIR}/join-worker.yml"
 PROMETHEUS_CFG     = "/opt/infra/prometheus/config/targets.json"
-GRAFANA_DASHBOARD  = "/var/lib/grafana/dashboards/k8s-guacamole.json"
+# Grafana/Prometheus run on the separate monitoring server, not here -- these two
+# paths are the bastion-local staging copies; _push_to_monitoring() mirrors them
+# to MONITORING_HOST after every local write (see _write_targets and
+# _update_grafana_nodename_variable below).
+GRAFANA_DASHBOARD        = "/opt/infra/prometheus/config/k8s-guacamole.json"
+GRAFANA_DASHBOARD_REMOTE = "/var/lib/grafana/dashboards/k8s-guacamole.json"
+MONITORING_HOST    = os.environ.get("MONITORING_HOST", "10.20.0.5")
 SSH_KEY            = "/root/.ssh/jilani"
 WORKER_BASE_IP     = 20   # 10.20.0.20+, same range as the base hzn-k8s-worker-1/2-dev nodes
 WORKER_ENV         = "dev"
@@ -249,6 +255,29 @@ def _ssh_run(ssh_base, remote_cmd, timeout=SSH_TIMEOUT):
         return subprocess.run(ssh_base + [remote_cmd], capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired as e:
         return subprocess.CompletedProcess(ssh_base, 255, stdout="", stderr=str(e))
+
+
+# Mirrors a locally-written staging file to the monitoring host, where Prometheus/
+# Grafana actually read it. Copies to a remote temp name then renames server-side
+# so Prometheus's file_sd / Grafana never read a partially-written file -- same
+# atomicity guarantee _write_targets() and _update_grafana_nodename_variable()
+# already give the local copy. Best-effort: a failed push here must not fail the
+# scale-out/scale-in that triggered it, so callers only log on failure.
+def _push_to_monitoring(local_path, remote_path):
+    remote_tmp = f"{remote_path}.tmp-{os.getpid()}"
+    scp = ["scp", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10",
+           local_path, f"root@{MONITORING_HOST}:{remote_tmp}"]
+    ssh = ["ssh", "-i", SSH_KEY, "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10",
+           f"root@{MONITORING_HOST}"]
+    try:
+        r = subprocess.run(scp, capture_output=True, text=True, timeout=SSH_TIMEOUT)
+        if r.returncode != 0:
+            raise RuntimeError(f"scp failed: {r.stderr}")
+        r = _ssh_run(ssh, f"mv {remote_tmp} {remote_path}", timeout=SSH_TIMEOUT)
+        if r.returncode != 0:
+            raise RuntimeError(f"remote mv failed: {r.stderr}")
+    except Exception as e:
+        logging.warning("Failed to push %s to monitoring host: %s", remote_path, e)
 
 
 def _rollback_new_worker(managed, new_worker_name):
@@ -489,6 +518,7 @@ def _write_targets(entries):
         except Exception:
             os.unlink(tmp_path)
             raise
+    _push_to_monitoring(PROMETHEUS_CFG, PROMETHEUS_CFG)
 
 
 # Keeps the k8s-guacamole dashboard's Nodename variable in lockstep with reality,
@@ -557,6 +587,7 @@ def _update_grafana_nodename_variable(nodes):
             logging.warning("Grafana Nodename sync: failed to write %s: %s", dest, e)
             return
 
+    _push_to_monitoring(GRAFANA_DASHBOARD, GRAFANA_DASHBOARD_REMOTE)
     logging.info("Grafana Nodename variable synced — %d node(s)", len(names))
 
 
