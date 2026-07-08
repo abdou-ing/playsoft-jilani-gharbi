@@ -14,6 +14,14 @@
       (e.g. `openssl rand -hex 32`). Without it the webhook refuses to start — anyone who could
       reach its port would otherwise be able to trigger scale-out/scale-in unauthenticated.
 
+- name: Assert SMTP_AUTH_PASSWORD is set on control node
+  ansible.builtin.assert:
+    that: lookup('env', 'SMTP_AUTH_PASSWORD') != ''
+    fail_msg: >-
+      Export SMTP_AUTH_PASSWORD before running: export SMTP_AUTH_PASSWORD=<gmail-app-password>.
+      Never commit this value -- it's read directly from the environment when
+      alertmanager.yml is templated.
+
 # ── 1. HashiCorp APT repo (required for Terraform) ────────────────────────────
 
 - name: Install prerequisites for HashiCorp repo
@@ -40,11 +48,12 @@
     filename: hashicorp
 
 # ── 2. Install packages ────────────────────────────────────────────────────────
+# Prometheus itself lives on the monitoring server now (see roles/prometheus) --
+# this host only needs ansible/terraform to drive worker scaling.
 
-- name: Install prometheus, ansible, terraform, python3
+- name: Install ansible, terraform, python3
   ansible.builtin.apt:
     name:
-      - prometheus
       - ansible
       - terraform
       - python3
@@ -119,15 +128,9 @@
     - "{{ infra_dir }}/terraform/modules/k8s-worker"
 
 # ── 6. Source files ────────────────────────────────────────────────────────────
-
-- name: Copy Prometheus config files
-  ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../prometheus/config/{{ item }}"
-    dest: "{{ infra_dir }}/config/{{ item }}"
-  loop:
-    - prometheus.yml
-    - alerts.yml
-  notify: restart prometheus
+# {{ infra_dir }}/config here is the bastion-local staging copy that webhook.py
+# writes and pushes to the monitoring server -- the real prometheus.yml/alerts.yml
+# only need to exist there (see roles/prometheus).
 
 - name: Create initial targets.json (skipped if file already exists)
   ansible.builtin.copy:
@@ -222,21 +225,6 @@
 
 # ── 10. Systemd units ─────────────────────────────────────────────────────────
 
-- name: Create prometheus systemd override directory
-  ansible.builtin.file:
-    path: /etc/systemd/system/prometheus.service.d
-    state: directory
-    mode: '0755'
-
-- name: Deploy prometheus systemd override (custom config path)
-  ansible.builtin.copy:
-    src: prometheus-override.conf
-    dest: /etc/systemd/system/prometheus.service.d/override.conf
-    mode: '0644'
-  notify:
-    - reload systemd
-    - restart prometheus
-
 - name: Deploy alertmanager systemd unit
   ansible.builtin.copy:
     src: alertmanager.service
@@ -259,13 +247,7 @@
   ansible.builtin.systemd:
     daemon_reload: yes
 
-# ── 11. Enable and start all three services ────────────────────────────────────
-
-- name: Enable and start prometheus
-  ansible.builtin.systemd:
-    name: prometheus
-    state: started
-    enabled: yes
+# ── 11. Enable and start remaining services ─────────────────────────────────────
 
 - name: Enable and start alertmanager
   ansible.builtin.systemd:

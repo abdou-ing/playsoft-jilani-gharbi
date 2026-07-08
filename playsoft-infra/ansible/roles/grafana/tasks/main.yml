@@ -16,6 +16,10 @@
     name: grafana
     state: present
     update_cache: yes
+    # A freshly booted bastion runs unattended-upgrades right after boot,
+    # which holds the dpkg lock for a few minutes -- wait it out instead of
+    # failing after the module's ~60s default.
+    lock_timeout: 300
 
 - name: Create Grafana provisioning directories
   ansible.builtin.file:
@@ -85,6 +89,25 @@
     group: grafana
     mode: '0644'
   notify: restart grafana
+
+# webhook.py (on the bastion) patches this dashboard's Nodename variable on every
+# scale event and pushes the result back here -- seed its bastion-side staging
+# copy so that patch loop has something to read on the very first run (see
+# GRAFANA_DASHBOARD / _update_grafana_nodename_variable in webhook.py).
+- name: Ensure bastion staging directory exists for the dashboard seed
+  ansible.builtin.file:
+    path: /opt/infra/prometheus/config
+    state: directory
+    mode: '0755'
+  delegate_to: "{{ groups['bastion'][0] }}"
+
+- name: Seed the bastion-side staging copy of the dashboard
+  ansible.builtin.copy:
+    content: "{{ patched_dashboard.stdout }}"
+    dest: /opt/infra/prometheus/config/k8s-guacamole.json
+    mode: '0644'
+    force: false
+  delegate_to: "{{ groups['bastion'][0] }}"
 
 - name: Enable and start Grafana
   ansible.builtin.systemd:

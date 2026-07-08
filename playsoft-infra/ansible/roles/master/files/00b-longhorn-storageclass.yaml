@@ -1,0 +1,15 @@
+# The "longhorn-2rep" StorageClass that 01-postgres.yaml's PVC references.
+# Applied (via "Apply all manifests" in roles/master/tasks/main.yml) after
+# Longhorn is installed and its CRDs/webhook are ready, before 01-postgres.yaml.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-2rep
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "2"
+  staleReplicaTimeout: "30"
+  fromBackup: ""

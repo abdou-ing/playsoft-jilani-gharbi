@@ -1,0 +1,188 @@
+# Runs after "Configure Kubernetes workers" so Longhorn/ESO (DaemonSets and
+# Deployments with no control-plane toleration) have untainted worker nodes
+# to schedule on.
+#
+# Gated on its own completion marker (not on kubeadm's admin.conf like the
+# master role) so that if this role is interrupted partway through -- e.g.
+# Longhorn applies fine but ESO install fails -- the *next* run retries the
+# whole sequence instead of silently skipping it forever just because the
+# cluster was already kubeadm-initialized.
+
+- name: Check whether the k8s-addons bootstrap already completed
+  ansible.builtin.stat:
+    path: /etc/kubernetes/.k8s-addons-applied
+  register: k8s_addons_applied
+  when: inventory_hostname == groups['k8s_master_servers'][0]
+
+- name: Wait for all nodes to be Ready
+  ansible.builtin.command: kubectl get nodes --no-headers
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: nodes_status
+  until: nodes_status.stdout_lines | select('search', 'NotReady') | list | length == 0
+  retries: 60
+  delay: 10
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+- name: Wait for kube-system pods to be Running
+  ansible.builtin.command: kubectl get pods -n kube-system --no-headers
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: system_pods
+  until: system_pods.stdout_lines | select('search', '0/') | list | length == 0
+  retries: 30
+  delay: 20
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+# ── Storage: Longhorn ─────────────────────────────────────────────────────────
+
+- name: Install Longhorn
+  ansible.builtin.command: kubectl apply -f https://raw.githubusercontent.com/longhorn/longhorn/v1.7.2/deploy/longhorn.yaml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+- name: Wait for longhorn-system pods to be Running
+  ansible.builtin.command: kubectl get pods -n longhorn-system --no-headers
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: longhorn_pods
+  until:
+    - longhorn_pods.stdout_lines | length > 0
+    - longhorn_pods.stdout_lines | select('search', '0/') | list | length == 0
+  retries: 30
+  delay: 20
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+# ── External Secrets Operator (via Helm) ──────────────────────────────────────
+# ESO only ships as a Helm chart (no static kubectl-apply-able bundle).
+# Helm is installed via the official get-helm-3 script (downloads the binary
+# release straight from GitHub) rather than the baltocdn.com apt/GPG route --
+# that CDN's signing.asc endpoint stopped serving a real key (now returns a
+# bare "OK"), which broke `gpg --dearmor` outright.
+
+- name: Download Helm install script
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    dest: /tmp/get-helm-3.sh
+    mode: '0700'
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+- name: Install helm
+  ansible.builtin.command: /tmp/get-helm-3.sh
+  args:
+    creates: /usr/local/bin/helm
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+- name: Add external-secrets Helm repo
+  ansible.builtin.command: helm repo add external-secrets https://charts.external-secrets.io
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+- name: Update Helm repos
+  ansible.builtin.command: helm repo update
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+# Pinned: an unpinned `helm upgrade --install` here silently picked up chart
+# releases across reruns until ESO's CRDs stopped serving v1beta1 (see
+# 07-vault-secrets.yaml.j2, apiVersion external-secrets.io/v1) -- pinning
+# means future API-breaking upgrades are a deliberate version bump, not a
+# surprise mid-run failure.
+- name: Install External Secrets Operator
+  ansible.builtin.command: >-
+    helm upgrade --install external-secrets external-secrets/external-secrets
+    -n external-secrets --create-namespace --version 2.7.0
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+- name: Wait for external-secrets pods to be Running
+  ansible.builtin.command: kubectl get pods -n external-secrets --no-headers
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: eso_pods
+  until:
+    - eso_pods.stdout_lines | length > 0
+    - eso_pods.stdout_lines | select('search', '0/') | list | length == 0
+  retries: 20
+  delay: 15
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+- name: Wipe the guacamole manifest dir (copy below only adds/updates -- this
+    keeps stale files from a previous run's removed manifests from lingering
+    and getting silently re-applied)
+  ansible.builtin.file:
+    path: /opt/guacamole_manifest
+    state: absent
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+- name: Copy files
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: /opt/guacamole_manifest/
+    mode: '0644'
+  with_fileglob:
+    - "{{ role_path }}/../master/files/*.yaml"
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+# Templated separately from the plain copy above because it needs
+# vault_approle_role_id substituted in (the guacamole-vault SecretStore's
+# AppRole auth block) -- role_id isn't a secret so it's fine as a plain var,
+# unlike secret_id which is minted and delivered separately by
+# k8s-vault/tasks/vault_config.yml (--tags k8s_vault).
+- name: Template the vault-secrets manifest (SecretStore/ExternalSecrets)
+  ansible.builtin.template:
+    src: 07-vault-secrets.yaml.j2
+    dest: /opt/guacamole_manifest/07-vault-secrets.yaml
+    mode: '0644'
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+- name: Apply all manifests
+  ansible.builtin.command: kubectl apply -f /opt/guacamole_manifest/
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+- name: Set default namespace to guacamole
+  ansible.builtin.command: kubectl config set-context --current --namespace=guacamole
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists
+
+- name: Mark the k8s-addons bootstrap as complete
+  ansible.builtin.file:
+    path: /etc/kubernetes/.k8s-addons-applied
+    state: touch
+    mode: '0644'
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_addons_applied.stat.exists

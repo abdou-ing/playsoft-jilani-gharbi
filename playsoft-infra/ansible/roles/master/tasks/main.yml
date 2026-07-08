@@ -12,6 +12,21 @@
     state: started
     enabled: yes
 
+# open-iscsi is a Longhorn prerequisite (its engine needs iscsid). Installed
+# here too (also in roles/worker/tasks/main.yml) since replicas can land on
+# any node.
+- name: Install open-iscsi (Longhorn prerequisite)
+  ansible.builtin.apt:
+    name: open-iscsi
+    state: present
+    update_cache: yes
+
+- name: Enable and start iscsid
+  ansible.builtin.systemd:
+    name: iscsid
+    state: started
+    enabled: yes
+
 # ── Check cluster state on each node ─────────────────────────────────────────
 
 - name: Check if node is already part of the cluster
@@ -83,17 +98,6 @@
     - inventory_hostname == groups['k8s_master_servers'][0]
     - not k8s_initialized.stat.exists
 
-- name: Copy files
-  ansible.builtin.copy:
-    src: "{{ item }}"
-    dest: /opt/guacamole_manifest/
-    mode: '0644'
-  with_fileglob:
-    - "*.yaml"
-  when:
-    - inventory_hostname == groups['k8s_master_servers'][0]
-    - not k8s_initialized.stat.exists
-
 # ── Additional masters: join as control-plane ─────────────────────────────────
 
 - name: Join additional masters as control-plane nodes
@@ -119,44 +123,9 @@
     - inventory_hostname != groups['k8s_master_servers'][0]
     - not k8s_initialized.stat.exists
 
-# ── First master: wait and finalize ───────────────────────────────────────────
-
-- name: Wait for all nodes to be Ready
-  ansible.builtin.command: kubectl get nodes --no-headers
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  register: nodes_status
-  until: nodes_status.stdout_lines | select('search', 'NotReady') | list | length == 0
-  retries: 60
-  delay: 10
-  when:
-    - inventory_hostname == groups['k8s_master_servers'][0]
-    - not k8s_initialized.stat.exists
-
-- name: Wait for kube-system pods to be Running
-  ansible.builtin.command: kubectl get pods -n kube-system --no-headers
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  register: system_pods
-  until: system_pods.stdout_lines | select('search', '0/') | list | length == 0
-  retries: 30
-  delay: 20
-  when:
-    - inventory_hostname == groups['k8s_master_servers'][0]
-    - not k8s_initialized.stat.exists
-
-- name: Apply all manifests
-  ansible.builtin.command: kubectl apply -f /opt/guacamole_manifest/
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  when:
-    - inventory_hostname == groups['k8s_master_servers'][0]
-    - not k8s_initialized.stat.exists
-
-- name: Set default namespace to guacamole
-  ansible.builtin.command: kubectl config set-context --current --namespace=guacamole
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  when:
-    - inventory_hostname == groups['k8s_master_servers'][0]
-    - not k8s_initialized.stat.exists
+# Cluster is left here for this play. Waiting for node readiness, installing
+# Longhorn/ESO, and applying the guacamole manifests all happen in the
+# "Deploy storage, secrets, and application manifests" play (roles/k8s-addons)
+# after workers have joined -- Longhorn/ESO pods have no control-plane
+# toleration and would hang Pending forever if applied while only tainted
+# master nodes exist in the cluster.

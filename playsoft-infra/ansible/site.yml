@@ -1,19 +1,27 @@
 ---
 # ---------------------------------------------------------------------------
-# 0. Prometheus Autoscaler Stack on Bastion
+# 0. Autoscaler brain (Alertmanager + webhook.py + worker-scaling automation)
+#    stays on the bastion -- it needs the same SSH key/HCLOUD_TOKEN access the
+#    bastion already has to reach masters/workers.
 # ---------------------------------------------------------------------------
-- name: Deploy Prometheus autoscaler stack on bastion
+- name: Deploy autoscaler stack on bastion
   hosts: bastion
   become: true
   tags: [autoscaler]
   roles:
     - autoscaler
 
-- name: Deploy Grafana on bastion
-  hosts: bastion
+# ---------------------------------------------------------------------------
+# 0b. Monitoring (Prometheus + Grafana) on its own dedicated server -- kept off
+#     the bastion so it isn't affected by autoscaler/webhook changes and vice
+#     versa. webhook.py pushes targets.json / the dashboard JSON here.
+# ---------------------------------------------------------------------------
+- name: Deploy Prometheus + Grafana on the monitoring server
+  hosts: monitoring
   become: true
-  tags: [grafana]
+  tags: [monitoring, prometheus, grafana]
   roles:
+    - prometheus
     - grafana
 
 # ---------------------------------------------------------------------------
@@ -32,7 +40,6 @@
   tags: [k8s_cluster]
   roles:
     - master
-    - clone-repo-guacamole
 
 - name: Configure Kubernetes workers
   hosts: k8s_workers
@@ -42,23 +49,26 @@
     - worker
 
 # ---------------------------------------------------------------------------
-# 1b. Vault <-> Kubernetes integration (opt-in: --tags k8s_vault)
-#     Adds the LB IP to the apiserver certSANs, regenerates the apiserver
-#     cert one master at a time, then writes the Vault kubernetes-auth
-#     config/role. Never runs as part of a normal site.yml pass.
+# 1a. Storage (Longhorn) + secrets (External Secrets Operator) + application
+#     manifests -- runs after workers have joined so their DaemonSets/
+#     Deployments (no control-plane toleration) have untainted nodes to
+#     schedule on.
 # ---------------------------------------------------------------------------
-- name: Wire up Vault kubernetes-auth certs on each master
+- name: Deploy storage, secrets, and application manifests
   hosts: k8s_master_servers
   become: true
-  serial: 1
-  tags: [k8s_vault]
-  tasks:
-    - name: Run k8s-vault certs tasks
-      ansible.builtin.include_role:
-        name: k8s-vault
-        tasks_from: certs.yml
+  tags: [k8s_cluster]
+  roles:
+    - k8s-addons
 
-- name: Configure Vault kubernetes-auth method + role
+# ---------------------------------------------------------------------------
+# 1b. Vault integration (opt-in: --tags k8s_vault)
+#     Mints a secret_id for the workload AppRole and delivers it (+ the
+#     stable role_id already baked into the SecretStore manifest) to the
+#     cluster as a Kubernetes Secret. Never runs as part of a normal
+#     site.yml pass.
+# ---------------------------------------------------------------------------
+- name: Configure Vault AppRole credentials for the guacamole-vault SecretStore
   hosts: localhost
   become: false
   tags: [k8s_vault]
@@ -67,6 +77,19 @@
       ansible.builtin.include_role:
         name: k8s-vault
         tasks_from: vault_config.yml
+
+# ---------------------------------------------------------------------------
+# 1c. On-demand: restore the latest S3 backup into Guacamole's postgres
+#     (--tags db_restore). Standalone role, never part of a normal site.yml
+#     pass -- run it manually whenever you want to (re)inject the newest
+#     guacdb-*.sql.gz from guacamole-backup-dev.
+# ---------------------------------------------------------------------------
+- name: Restore the latest backup into Guacamole's postgres
+  hosts: k8s_master_servers
+  become: true
+  tags: [db_restore]
+  roles:
+    - db-restore
 
 # ---------------------------------------------------------------------------
 # 1. Proxmox: Configure Access on the VM

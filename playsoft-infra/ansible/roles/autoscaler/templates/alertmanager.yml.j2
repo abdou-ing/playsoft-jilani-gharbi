@@ -3,7 +3,7 @@ global:
   smtp_smarthost: '{{ smtp_smarthost }}'
   smtp_from: '{{ smtp_from }}'
   smtp_auth_username: '{{ smtp_auth_username }}'
-  smtp_auth_password: '{{ smtp_auth_password }}'
+  smtp_auth_password: '{{ lookup("env", "SMTP_AUTH_PASSWORD") }}'
   smtp_require_tls: true
 
 route:

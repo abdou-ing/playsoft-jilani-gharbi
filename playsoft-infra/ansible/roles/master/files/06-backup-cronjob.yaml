@@ -18,7 +18,12 @@ spec:
               emptyDir: {}
           initContainers:
             - name: fetch-mc
+              # Pinned mc release (tested against Hetzner/Ceph RGW endpoint) instead of
+              # curl-ing the unpinned "latest" binary at runtime.
               image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+              # Also copy this image's CA bundle: the postgres:15.3 (Debian) container
+              # doesn't ship one on its own, and this mc binary needs it to make TLS
+              # calls to the S3 endpoint once it's running under Debian's libc/paths.
               command: ["/bin/sh", "-c", "cp /usr/bin/mc /mc-bin/mc && cp /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /mc-bin/ca-bundle.pem"]
               volumeMounts:
                 - name: mc-bin

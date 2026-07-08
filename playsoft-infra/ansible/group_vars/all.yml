@@ -9,6 +9,18 @@ k8s_master_ips: "{{ _tf.k8s_master_private_ips.value }}"
 k8s_worker_ips: "{{ _tf.k8s_worker_private_ips.value }}"
 k8s_lb_public_ip: "{{ _tf.load_balancer_public_ip.value }}"
 
+# ─────────────────────────────────────────────────────────────
+# Vault AppRole used both by ansible itself (bootstrap login, via
+# VAULT_ROLE_ID/VAULT_SECRET_ID env vars) and by the in-cluster
+# guacamole-vault SecretStore (roles/k8s-addons/templates/07-vault-secrets.yaml.j2),
+# which reuses that same VAULT_SECRET_ID (delivered by --tags k8s_vault as a
+# Kubernetes Secret, never committed). role_id is not itself a secret
+# (Vault's AppRole security model puts the actual credential in secret_id
+# only), so it's fine as a plain value here.
+# ─────────────────────────────────────────────────────────────
+vault_approle_role_id: "<VAULT_ROLE_ID>"  # `vault read auth/jilani-approle/role/ansible_instalab/role-id`
+vault_approle_k8s_secret_name: "vault-approle-creds"
+
 # Guacamole route name
 guac_route: guacamole
 

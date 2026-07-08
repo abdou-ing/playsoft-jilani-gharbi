@@ -1,9 +1,11 @@
 ---
-# Each Vault task below authenticates directly via the jilani-dev AppRole
-# (auth_method/role_id/secret_id merged into every module's args via the
-# vault_auth_args fact + combine filter) instead of doing a separate
-# vault_login and threading a client_token through every later task —
-# simpler, and avoids token-passing edge cases entirely.
+# The guacamole-vault SecretStore authenticates to Vault as the same
+# ansible_instalab AppRole ansible itself bootstraps with (VAULT_ROLE_ID/
+# VAULT_SECRET_ID), not Kubernetes auth -- so this role just delivers that
+# same secret_id into the cluster as a Kubernetes Secret. No TokenReview/
+# apiserver-certSAN wiring needed since Vault never calls back into the k8s
+# API, and no extra Vault policy permissions needed since we're not minting
+# anything new here.
 
 - name: Assert the AppRole bootstrap credentials are present
   ansible.builtin.assert:
@@ -14,91 +16,23 @@
       Export VAULT_ROLE_ID / VAULT_SECRET_ID before
       running this role (the jilani-dev AppRole credentials).
 
-- name: Set the shared Vault connection/auth params used by every task below
+- name: Build the Secret manifest for the workload AppRole's secret_id
   ansible.builtin.set_fact:
-    vault_auth_args:
-      url: "{{ vault_addr }}"
-      auth_method: approle
-      role_id: "{{ lookup('env', 'VAULT_ROLE_ID') }}"
-      secret_id: "{{ lookup('env', 'VAULT_SECRET_ID') }}"
+    vault_approle_secret_manifest: >-
+      {{ {
+          'apiVersion': 'v1',
+          'kind': 'Secret',
+          'metadata': {'name': vault_approle_k8s_secret_name, 'namespace': 'guacamole'},
+          'stringData': {'secretId': lookup('env', 'VAULT_SECRET_ID')}
+        } | to_nice_yaml }}
   no_log: true
 
-- name: Fetch the token-reviewer JWT from the cluster (vault-auth-delegator SA)
+- name: Apply the workload AppRole Secret (stdin keeps secret_id out of argv/logs)
   ansible.builtin.command:
-    cmd: >-
-      kubectl get secret {{ vault_auth_delegator_secret }}
-      -n {{ vault_auth_delegator_namespace }}
-      -o jsonpath='{.data.token}'
+    cmd: kubectl apply -f -
+    stdin: "{{ vault_approle_secret_manifest }}"
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
   delegate_to: "{{ groups['k8s_master_servers'][0] }}"
-  register: reviewer_jwt_b64
-  changed_when: false
+  changed_when: true
   no_log: true
-
-- name: Fetch the cluster CA cert from the same secret
-  ansible.builtin.command:
-    cmd: >-
-      kubectl get secret {{ vault_auth_delegator_secret }}
-      -n {{ vault_auth_delegator_namespace }}
-      -o jsonpath='{.data.ca\.crt}'
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-  delegate_to: "{{ groups['k8s_master_servers'][0] }}"
-  register: reviewer_ca_b64
-  changed_when: false
-
-- name: Check whether the kubernetes auth mount already exists
-  community.hashi_vault.vault_read: "{{ vault_auth_args | combine({'path': 'sys/auth'}) }}"
-  register: sys_auth_list
-
-- name: Enable the kubernetes auth method at the project's mount path (only if missing)
-  community.hashi_vault.vault_write: >-
-    {{ vault_auth_args | combine({
-        'path': 'sys/auth/' + vault_k8s_auth_mount,
-        'data': {'type': 'kubernetes'}
-    }) }}
-  when: (vault_k8s_auth_mount + '/') not in sys_auth_list.data
-
-- name: Read the current auth config, if any (token_reviewer_jwt is write-only so can't be compared)
-  community.hashi_vault.vault_read: "{{ vault_auth_args | combine({'path': 'auth/' + vault_k8s_auth_mount + '/config'}) }}"
-  register: current_auth_config
-  ignore_errors: true
-
-- name: Write the kubernetes auth config (host, CA, reviewer JWT) — only if host/CA differ
-  community.hashi_vault.vault_write: >-
-    {{ vault_auth_args | combine({
-        'path': 'auth/' + vault_k8s_auth_mount + '/config',
-        'data': {
-          'kubernetes_host': 'https://' + k8s_lb_ip + ':6443',
-          'kubernetes_ca_cert': reviewer_ca_b64.stdout | b64decode,
-          'token_reviewer_jwt': reviewer_jwt_b64.stdout | b64decode
-        }
-    }) }}
-  no_log: true
-  when: >-
-    current_auth_config is failed or
-    current_auth_config.data.data.kubernetes_host != ("https://" + k8s_lb_ip + ":6443") or
-    current_auth_config.data.data.kubernetes_ca_cert != (reviewer_ca_b64.stdout | b64decode)
-
-- name: Read the current role, if any
-  community.hashi_vault.vault_read: "{{ vault_auth_args | combine({'path': 'auth/' + vault_k8s_auth_mount + '/role/' + vault_k8s_role_name}) }}"
-  register: current_k8s_role
-  ignore_errors: true
-
-- name: Bind the guacamole-vault ServiceAccount to the role — only if it differs
-  community.hashi_vault.vault_write: >-
-    {{ vault_auth_args | combine({
-        'path': 'auth/' + vault_k8s_auth_mount + '/role/' + vault_k8s_role_name,
-        'data': {
-          'bound_service_account_names': 'guacamole-vault',
-          'bound_service_account_namespaces': 'guacamole',
-          'policies': vault_k8s_policy_name,
-          'ttl': '1h'
-        }
-    }) }}
-  when: >-
-    current_k8s_role is failed or
-    current_k8s_role.data.data.bound_service_account_names != ["guacamole-vault"] or
-    current_k8s_role.data.data.bound_service_account_namespaces != ["guacamole"] or
-    current_k8s_role.data.data.token_policies != [vault_k8s_policy_name]

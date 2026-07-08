@@ -10,6 +10,21 @@
     state: started
     enabled: yes
 
+# open-iscsi is a Longhorn prerequisite (its engine needs iscsid) -- Longhorn
+# itself is installed from the master role, but replicas can land on any
+# node so every node needs iscsid running.
+- name: Install open-iscsi (Longhorn prerequisite)
+  ansible.builtin.apt:
+    name: open-iscsi
+    state: present
+    update_cache: yes
+
+- name: Enable and start iscsid
+  ansible.builtin.systemd:
+    name: iscsid
+    state: started
+    enabled: yes
+
 - name: Check if node is already part of the cluster
   stat:
     path: /etc/kubernetes/kubelet.conf

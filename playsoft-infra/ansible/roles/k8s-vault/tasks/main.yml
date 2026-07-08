@@ -3,5 +3,4 @@
   ansible.builtin.fail:
     msg: >-
       k8s-vault has no default tasks. Use
-      '{ role: k8s-vault, tasks_from: certs.yml }' on the masters or
       '{ role: k8s-vault, tasks_from: vault_config.yml }' on localhost.

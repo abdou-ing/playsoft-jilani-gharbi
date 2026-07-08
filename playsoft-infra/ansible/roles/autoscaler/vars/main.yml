@@ -6,9 +6,11 @@ autoscaler_env_dir: /etc/autoscaler
 ssh_key_path: /root/.ssh/jilani
 ssh_key_local_path: "{{ lookup('env', 'HOME') }}/.ssh/jilani"
 
-# Email alerting — override in group_vars/bastion.yml or ansible-vault
+# Email alerting. smtp_auth_password is NOT here -- it's exported as
+# SMTP_AUTH_PASSWORD on the control node and read directly by
+# templates/alertmanager.yml.j2 (same pattern as WEBHOOK_SHARED_SECRET),
+# so it's never written to a vars file that gets committed.
 smtp_smarthost: "smtp.gmail.com:587"
 smtp_from: "gharbijilani001@gmail.com"
 smtp_auth_username: "gharbijilani001@gmail.com"
-smtp_auth_password: "eippctuerurvlqwl"
 alert_email_to: "jilanigharbi88@gmail.com"
