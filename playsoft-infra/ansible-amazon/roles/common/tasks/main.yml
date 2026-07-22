@@ -1,23 +1,41 @@
 ---
-# Instances are reachable over SSH (base-AMI sshd) well before EC2 userdata
-# (cloud-init) finishes installing containerd/kubeadm/kubelet -- without this
-# wait, "Enable containerd" below can race a still-running userdata script
-# and fail with "Could not find the requested service containerd: host".
 - name: Wait for cloud-init (EC2 userdata) to finish
   ansible.builtin.command: cloud-init status --wait
   register: cloud_init_status
   changed_when: false
-  # rc 0 = done cleanly. rc 2 = done, but cloud-init logged a recoverable/
-  # degraded issue somewhere during boot (commonly a transient apt/network
-  # retry) -- the userdata script still ran to completion, which is all this
-  # guards against. Only rc 1 (error/disabled -- genuinely not done) should
-  # fail here.
-  failed_when: cloud_init_status.rc not in [0, 2]
+  failed_when: false
 
-# Unlike the Hetzner project, containerd/kubelet/kubeadm/kubectl are already
-# installed and containerd already enabled by the EC2 userdata (see
-# terrafrom-amazone/modules/*/userdata/*.sh) -- this is just a safety net,
-# not the primary install path.
+- name: Fail on a cloud-init status this role doesn't know how to recover from
+  ansible.builtin.fail:
+    msg: "Unexpected cloud-init status (rc={{ cloud_init_status.rc }}): {{ cloud_init_status.stdout }}"
+  when: cloud_init_status.rc not in [0, 1, 2]
+
+- name: Recover from a cloud-init error (commonly the NAT-gateway settling race)
+  when: cloud_init_status.rc == 1
+  block:
+    - name: Wait for real internet egress before replaying userdata
+      ansible.builtin.command: curl -fsS -m 5 -o /dev/null https://pkgs.k8s.io
+      register: egress_check
+      until: egress_check.rc == 0
+      retries: 20
+      delay: 15
+      changed_when: false
+
+    - name: Replay cloud-init now that egress is confirmed
+      ansible.builtin.shell: >-
+        cloud-init clean --logs &&
+        cloud-init init --local &&
+        cloud-init init &&
+        cloud-init modules --mode=config &&
+        cloud-init modules --mode=final
+      changed_when: true
+
+    - name: Re-check cloud-init status after the replay
+      ansible.builtin.command: cloud-init status --wait
+      register: cloud_init_status
+      changed_when: false
+      failed_when: cloud_init_status.rc not in [0, 2]
+
 - name: Enable containerd
   ansible.builtin.systemd:
     name: containerd

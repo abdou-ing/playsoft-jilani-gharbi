@@ -96,28 +96,14 @@ done
 echo "⏳ Waiting for SSH to come up on all hosts..."
 ansible all -i inventory/aws_ec2.yml -m ansible.builtin.wait_for_connection -a "timeout=300"
 
-# -------------------------------------------------------------------
-#     WAIT FOR REAL INTERNET EGRESS ON MASTER/WORKER (NAT SETTLE)
-# -------------------------------------------------------------------
 # A fresh NAT gateway's API status flips to "available" well before its
-# data path actually forwards traffic -- and an ASG-launched worker can
-# start booting (and running userdata) noticeably later than the
-# master's plain instance, so a single flat sleep after `terraform
-# apply` can't cover both (seen live: master's userdata succeeded,
-# worker's failed outright on apt/curl at the same elapsed time).
-# sshd coming up (checked above) doesn't imply NAT is usable yet, since
-# it's served from the base AMI independent of egress -- poll the same
-# thing userdata itself needs instead of guessing a delay.
-echo "⏳ Waiting for real internet egress on master/worker..."
-for i in $(seq 1 20); do
-  if ansible k8s_master_servers,k8s_workers -i inventory/aws_ec2.yml \
-      -m ansible.builtin.shell -a "curl -fsS -m 5 -o /dev/null https://pkgs.k8s.io" >/dev/null 2>&1; then
-    echo "Egress confirmed on all nodes."
-    break
-  fi
-  echo "   not ready yet (attempt ${i}/20), retrying in 15s..."
-  sleep 15
-done
+# data path actually forwards traffic, which can fail master/worker
+# userdata's apt-get/curl calls outright (an ASG-launched worker can also
+# boot noticeably later than the master's plain instance, so this can hit
+# either independently). roles/common's "Wait for cloud-init" task detects
+# and recovers from exactly this -- confirms real egress, then replays
+# userdata -- so it's handled inside the playbook below, not duplicated
+# here.
 
 # -------------------------------------------------------------------
 #         ANSIBLE — CLUSTER + GUACAMOLE + VAULT AppRole DELIVERY
