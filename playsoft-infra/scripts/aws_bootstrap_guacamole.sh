@@ -63,22 +63,6 @@ ALB_DNS=$(jq -r '.alb_dns_name.value' tf_output.json)
 echo "✅ Terraform apply completed. bastion=${BASTION_IP} control_plane=${CP_ENDPOINT}"
 
 # -------------------------------------------------------------------
-#          LET THE NAT GATEWAY'S DATA PATH SETTLE
-# -------------------------------------------------------------------
-# Master/worker userdata starts installing packages (apt, pkgs.k8s.io)
-# within seconds of boot -- if the apply above just created the NAT
-# gateway, its API status flips to "available" well before its data
-# path actually forwards traffic. Seen live: NAT created at T+0,
-# instance egress still fully unreachable at T+70s, causing apt-get/curl
-# in the userdata to fail outright and cloud-init to record a permanent
-# error status for that boot. Terraform has no resource to wait on for
-# this, so it's a plain sleep -- costs nothing on a run where the NAT
-# already existed, cheap insurance against a failed userdata run on one
-# where it didn't.
-echo "⏳ Letting the NAT gateway settle before instances hit the internet..."
-sleep 90
-
-# -------------------------------------------------------------------
 #          WAIT FOR MASTER/WORKER INSTANCES TO APPEAR IN AWS
 # -------------------------------------------------------------------
 # ansible-amazon has no static inventory to regenerate -- its dynamic
@@ -91,7 +75,7 @@ for i in $(seq 1 20); do
   HOST_COUNT=$(ansible-inventory -i inventory/aws_ec2.yml --list 2>/dev/null \
     | jq -r '(._meta.hostvars // {}) | keys | length')
   if [ "${HOST_COUNT}" -ge 1 ]; then
-    echo "✅ ${HOST_COUNT} host(s) visible."
+    echo "${HOST_COUNT} host(s) visible."
     break
   fi
   echo "   not ready yet (attempt ${i}/20), retrying in 15s..."
@@ -111,6 +95,29 @@ done
 # covers all hosts in parallel.
 echo "⏳ Waiting for SSH to come up on all hosts..."
 ansible all -i inventory/aws_ec2.yml -m ansible.builtin.wait_for_connection -a "timeout=300"
+
+# -------------------------------------------------------------------
+#     WAIT FOR REAL INTERNET EGRESS ON MASTER/WORKER (NAT SETTLE)
+# -------------------------------------------------------------------
+# A fresh NAT gateway's API status flips to "available" well before its
+# data path actually forwards traffic -- and an ASG-launched worker can
+# start booting (and running userdata) noticeably later than the
+# master's plain instance, so a single flat sleep after `terraform
+# apply` can't cover both (seen live: master's userdata succeeded,
+# worker's failed outright on apt/curl at the same elapsed time).
+# sshd coming up (checked above) doesn't imply NAT is usable yet, since
+# it's served from the base AMI independent of egress -- poll the same
+# thing userdata itself needs instead of guessing a delay.
+echo "⏳ Waiting for real internet egress on master/worker..."
+for i in $(seq 1 20); do
+  if ansible k8s_master_servers,k8s_workers -i inventory/aws_ec2.yml \
+      -m ansible.builtin.shell -a "curl -fsS -m 5 -o /dev/null https://pkgs.k8s.io" >/dev/null 2>&1; then
+    echo "Egress confirmed on all nodes."
+    break
+  fi
+  echo "   not ready yet (attempt ${i}/20), retrying in 15s..."
+  sleep 15
+done
 
 # -------------------------------------------------------------------
 #         ANSIBLE — CLUSTER + GUACAMOLE + VAULT AppRole DELIVERY
