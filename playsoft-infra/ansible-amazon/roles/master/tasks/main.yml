@@ -1,26 +1,4 @@
 ---
-# kube-proxy's kubeconfig is a single cluster-wide ConfigMap baked by
-# kubeadm with server: https://<controlPlaneEndpoint> (the control-plane
-# NLB's DNS name) -- correct for workers (a genuine cross-instance path
-# through the NLB), but kube-proxy also runs on the master itself via the
-# same DaemonSet, which hits the exact NLB self-hairpin problem described
-# below for kubeadm's own CLI calls. Unlike those, kube-proxy's kubeconfig
-# can't be swapped per-node (it reads the one shared ConfigMap), so instead
-# this overrides DNS resolution at the OS level: kube-proxy and calico-node
-# both run with hostNetwork: true, so they see the host's /etc/hosts too.
-# Redirecting the NLB hostname to 127.0.0.1 here only affects this master
-# (every master runs its own local apiserver, so this is correct even with
-# multiple masters) -- workers are untouched and keep resolving the real
-# NLB. Without this, kube-proxy never syncs (stuck at "Waiting for caches
-# to sync"), no Service iptables rules get programmed, and calico-node's
-# install-cni container fails forever trying to reach the in-cluster
-# kubernetes ClusterIP (10.96.0.1) to fetch its token.
-- name: Point the control-plane endpoint hostname at localhost on this master
-  ansible.builtin.lineinfile:
-    path: /etc/hosts
-    line: "127.0.0.1 {{ control_plane_host }}"
-    create: true
-
 # ── Monitoring agent ─────────────────────────────────────────────────────────
 # Already apt-installed by the master userdata; this just guarantees it's
 # running (matches the equivalent task in ansible/roles/master).
@@ -53,10 +31,10 @@
   register: k8s_initialized
 
 # ── First master: init ────────────────────────────────────────────────────────
-# master_count is pinned to 1 in terrafrom-amazone (see root variables.tf),
-# so groups['k8s_master_servers'] only ever has one host today -- this is
-# still written as "first master" / "additional masters" to match the
-# Hetzner project's role and stay correct if that ever changes.
+# aws_terrafrom provisions a single static master instance (no ASG, no HA
+# join flow), so groups['k8s_master_servers'] only ever has one host today
+# -- this is still written as "first master" / "additional masters" to
+# match the Hetzner project's role and stay correct if that ever changes.
 
 - name: Deploy kubeadm config
   ansible.builtin.template:
@@ -91,18 +69,6 @@
     - inventory_hostname == groups['k8s_master_servers'][0]
     - not k8s_initialized.stat.exists
 
-# kubeadm's own CLI calls (upload-certs, token create) hit the same NLB
-# self-hairpin as kube-proxy/calico-node -- but unlike those, this is
-# fixed by the /etc/hosts task above, not a separate kubeconfig: kubeadm
-# and kubectl run as plain processes in the host network namespace, so
-# they resolve the NLB hostname via /etc/hosts too and land on the local
-# apiserver transparently. Deliberately still using the real
-# admin.conf/NLB hostname (not a 127.0.0.1-rewritten copy) here: `kubeadm
-# token create --print-join-command` embeds whatever host string the
-# --kubeconfig it's given resolves *as text*, not the cluster's recorded
-# controlPlaneEndpoint -- pointing it at a literal 127.0.0.1 kubeconfig
-# earlier produced a join command that said "join 127.0.0.1:6443", which
-# is meaningless on the worker that has to run it.
 - name: Upload control-plane certs and capture certificate key
   ansible.builtin.command: kubeadm init phase upload-certs --upload-certs
   register: upload_certs_output
@@ -128,9 +94,9 @@
 - name: Install Calico
   # kubectl apply is idempotent -- deliberately NOT gated on
   # k8s_initialized (unlike init/copy-admin-conf above), so a rerun
-  # after a mid-play failure (e.g. the NLB-hairpin issue /etc/hosts
-  # above works around) still applies it instead of skipping forever
-  # just because admin.conf already exists from the earlier partial run.
+  # after a mid-play failure still applies it instead of skipping
+  # forever just because admin.conf already exists from an earlier
+  # partial run.
   ansible.builtin.command: kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
