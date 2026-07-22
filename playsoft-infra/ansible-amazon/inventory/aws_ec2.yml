@@ -1,0 +1,17 @@
+plugin: amazon.aws.aws_ec2
+
+regions:
+  - us-east-1
+
+filters:
+  tag:kubernetes_cluster: guacamole
+  instance-state-name: running
+
+compose:
+  ansible_host: public_ip_address | default(private_ip_address)
+
+groups:
+  bastion: "'k8s_role' in tags and tags.k8s_role == 'bastion'"
+  k8s_master_servers: "'k8s_role' in tags and tags.k8s_role == 'master'"
+  k8s_workers: "'k8s_role' in tags and tags.k8s_role == 'worker'"
+  k8s_nodes: "'k8s_role' in tags and tags.k8s_role in ['master', 'worker']"

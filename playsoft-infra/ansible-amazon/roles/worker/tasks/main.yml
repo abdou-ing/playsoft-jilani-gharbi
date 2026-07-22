@@ -1,0 +1,30 @@
+---
+- name: Enable and start node_exporter
+  ansible.builtin.systemd:
+    name: prometheus-node-exporter
+    state: started
+    enabled: true
+
+# open-iscsi is a Longhorn prerequisite (its engine needs iscsid) -- Longhorn
+# itself is installed from the k8s-addons role, but replicas can land on any
+# node so every node needs iscsid running.
+- name: Install open-iscsi (Longhorn prerequisite)
+  ansible.builtin.apt:
+    name: open-iscsi
+    state: present
+    update_cache: true
+
+- name: Enable and start iscsid
+  ansible.builtin.systemd:
+    name: iscsid
+    state: started
+    enabled: true
+
+- name: Check if node is already part of the cluster
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: k8s_initialized
+
+- name: Join Kubernetes cluster
+  ansible.builtin.command: "{{ hostvars[groups['k8s_master_servers'][0]].kube_join_command }}"
+  when: not k8s_initialized.stat.exists

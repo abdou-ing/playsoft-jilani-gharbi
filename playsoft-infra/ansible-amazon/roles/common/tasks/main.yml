@@ -1,0 +1,25 @@
+---
+# Instances are reachable over SSH (base-AMI sshd) well before EC2 userdata
+# (cloud-init) finishes installing containerd/kubeadm/kubelet -- without this
+# wait, "Enable containerd" below can race a still-running userdata script
+# and fail with "Could not find the requested service containerd: host".
+- name: Wait for cloud-init (EC2 userdata) to finish
+  ansible.builtin.command: cloud-init status --wait
+  register: cloud_init_status
+  changed_when: false
+  # rc 0 = done cleanly. rc 2 = done, but cloud-init logged a recoverable/
+  # degraded issue somewhere during boot (commonly a transient apt/network
+  # retry) -- the userdata script still ran to completion, which is all this
+  # guards against. Only rc 1 (error/disabled -- genuinely not done) should
+  # fail here.
+  failed_when: cloud_init_status.rc not in [0, 2]
+
+# Unlike the Hetzner project, containerd/kubelet/kubeadm/kubectl are already
+# installed and containerd already enabled by the EC2 userdata (see
+# terrafrom-amazone/modules/*/userdata/*.sh) -- this is just a safety net,
+# not the primary install path.
+- name: Enable containerd
+  ansible.builtin.systemd:
+    name: containerd
+    state: started
+    enabled: true

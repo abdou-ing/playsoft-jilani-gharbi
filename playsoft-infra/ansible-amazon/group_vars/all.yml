@@ -1,0 +1,30 @@
+---
+# ──────────────────────────────────────────────
+# Shared / global variables available to all hosts
+# ──────────────────────────────────────────────
+
+# Same convention as ansible/group_vars/all.yml for the Hetzner project:
+# run `terraform output -json > tf_output.json` inside terrafrom-amazone/
+# after every apply, then this file reads it back.
+_tf: "{{ lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terrafrom-amazone/tf_output.json') | from_json }}"
+bastion_public_ip: "{{ _tf.bastion_public_ip.value }}"
+
+# NLB DNS name ("host:6443") -- see modules/k8s-master/main.tf. Split off
+# the port for places (like certSANs) that need the bare hostname.
+control_plane_endpoint: "{{ _tf.control_plane_endpoint.value }}"
+control_plane_host: "{{ control_plane_endpoint.split(':')[0] }}"
+
+kubernetes_version: "v1.35.5"
+
+# ─────────────────────────────────────────────────────────────
+# Same Vault AppRole/backend as the Hetzner project (ansible/group_vars/all.yml)
+# -- reused as-is, not a separate AWS Vault setup. role_id is not itself a
+# secret; secret_id is delivered separately via --tags k8s_vault (never
+# committed). See roles/k8s-vault/tasks/vault_config.yml.
+# ─────────────────────────────────────────────────────────────
+vault_approle_role_id: "ea989d3f-4b56-2c56-5b8f-187753cb1174"
+vault_approle_k8s_secret_name: "vault-approle-creds"
+
+ansible_user: ubuntu
+ansible_ssh_private_key_file: /home/jilani/.ssh/jilani
+ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'

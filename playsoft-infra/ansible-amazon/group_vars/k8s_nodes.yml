@@ -1,0 +1,7 @@
+---
+# Master/worker instances have no public IP (private subnet) -- every SSH
+# hop has to go through the bastion's EIP, same idea as the Hetzner
+# project's [k8s_nodes:vars] ProxyCommand in ansible/inventory.ini.
+ansible_ssh_common_args: >-
+  -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+  -o ProxyCommand="ssh -i {{ ansible_ssh_private_key_file }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -l ubuntu {{ bastion_public_ip }} -W %h:%p"

@@ -1,0 +1,5 @@
+---
+# Opt-in role: only ever runs when invoked with --tags k8s_vault.
+# Delivers the ansible bootstrap AppRole's VAULT_SECRET_ID to the cluster as
+# a Kubernetes Secret so the guacamole-vault SecretStore can authenticate to
+# Vault (vault_approle_* vars live in group_vars/all.yml).

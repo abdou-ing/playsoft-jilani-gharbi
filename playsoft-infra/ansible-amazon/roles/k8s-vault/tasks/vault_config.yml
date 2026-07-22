@@ -1,0 +1,43 @@
+---
+# The guacamole-vault SecretStore authenticates to Vault as the same
+# ansible_instalab AppRole ansible itself bootstraps with (VAULT_ROLE_ID/
+# VAULT_SECRET_ID), not Kubernetes auth -- so this role just delivers that
+# same secret_id into the cluster as a Kubernetes Secret. No TokenReview/
+# apiserver-certSAN wiring needed since Vault never calls back into the k8s
+# API, and no extra Vault policy permissions needed since we're not minting
+# anything new here.
+
+- name: Assert the AppRole bootstrap credentials are present
+  ansible.builtin.assert:
+    that:
+      - lookup('env', 'VAULT_ROLE_ID') != ''
+      - lookup('env', 'VAULT_SECRET_ID') != ''
+    fail_msg: >-
+      Export VAULT_ROLE_ID / VAULT_SECRET_ID before
+      running this role (the jilani-dev AppRole credentials).
+
+- name: Build the Secret manifest for the workload AppRole's secret_id
+  ansible.builtin.set_fact:
+    vault_approle_secret_manifest: >-
+      {{ {
+          'apiVersion': 'v1',
+          'kind': 'Secret',
+          'metadata': {'name': vault_approle_k8s_secret_name, 'namespace': 'guacamole'},
+          'stringData': {'secretId': lookup('env', 'VAULT_SECRET_ID')}
+        } | to_nice_yaml }}
+  no_log: true
+
+- name: Apply the workload AppRole Secret (stdin keeps secret_id out of argv/logs)
+  ansible.builtin.command:
+    cmd: kubectl apply -f -
+    stdin: "{{ vault_approle_secret_manifest }}"
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  delegate_to: "{{ groups['k8s_master_servers'][0] }}"
+  # This play runs with become: false (correct for its own hosts: localhost
+  # tasks), but the delegated task actually executes on the master as
+  # ansible_user (ubuntu here, not root like the Hetzner project's nodes) --
+  # admin.conf is 600 root:root, so this needs its own become to read it.
+  become: true
+  changed_when: true
+  no_log: true

@@ -1,0 +1,62 @@
+---
+# Kubernetes cluster bootstrap for the AWS self-managed cluster
+# (terrafrom-amazone). Cluster + storage + the Guacamole app layer, mirroring
+# ansible/ (Hetzner) and reusing its same Vault backend/AppRole. Still no
+# monitoring stack or autoscaler here -- those stay Hetzner-only for now.
+
+- name: Configure Kubernetes nodes (common)
+  hosts: k8s_nodes
+  become: true
+  tags: [k8s_cluster]
+  roles:
+    - common
+
+- name: Configure Kubernetes masters
+  hosts: k8s_master_servers
+  become: true
+  tags: [k8s_cluster]
+  roles:
+    - master
+
+- name: Configure Kubernetes workers
+  hosts: k8s_workers
+  become: true
+  tags: [k8s_cluster]
+  roles:
+    - worker
+
+- name: Deploy storage, secrets, and application manifests
+  hosts: k8s_master_servers
+  become: true
+  tags: [k8s_cluster]
+  roles:
+    - k8s-addons
+
+# ---------------------------------------------------------------------------
+# Vault integration (opt-in: --tags k8s_vault). Mints/delivers the workload
+# AppRole's secret_id -- never runs as part of a normal site.yml pass.
+# Requires VAULT_ROLE_ID / VAULT_SECRET_ID exported locally first.
+# ---------------------------------------------------------------------------
+- name: Configure Vault AppRole credentials for the guacamole-vault SecretStore
+  hosts: localhost
+  become: false
+  tags: [k8s_vault]
+  tasks:
+    - name: Run k8s-vault vault_config tasks
+      ansible.builtin.include_role:
+        name: k8s-vault
+        tasks_from: vault_config.yml
+
+# ---------------------------------------------------------------------------
+# On-demand: restore the latest S3 backup into Guacamole's postgres
+# (--tags db_restore). Standalone role, never part of a normal site.yml
+# pass -- run it manually whenever you want to (re)inject the newest
+# guacdb-*.sql.gz from guacamole-backup-dev/aws/. Mirrors ansible/site.yml's
+# equivalent play.
+# ---------------------------------------------------------------------------
+- name: Restore the latest backup into Guacamole's postgres
+  hosts: k8s_master_servers
+  become: true
+  tags: [db_restore]
+  roles:
+    - db-restore

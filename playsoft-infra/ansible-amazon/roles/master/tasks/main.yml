@@ -1,0 +1,170 @@
+---
+# kube-proxy's kubeconfig is a single cluster-wide ConfigMap baked by
+# kubeadm with server: https://<controlPlaneEndpoint> (the control-plane
+# NLB's DNS name) -- correct for workers (a genuine cross-instance path
+# through the NLB), but kube-proxy also runs on the master itself via the
+# same DaemonSet, which hits the exact NLB self-hairpin problem described
+# below for kubeadm's own CLI calls. Unlike those, kube-proxy's kubeconfig
+# can't be swapped per-node (it reads the one shared ConfigMap), so instead
+# this overrides DNS resolution at the OS level: kube-proxy and calico-node
+# both run with hostNetwork: true, so they see the host's /etc/hosts too.
+# Redirecting the NLB hostname to 127.0.0.1 here only affects this master
+# (every master runs its own local apiserver, so this is correct even with
+# multiple masters) -- workers are untouched and keep resolving the real
+# NLB. Without this, kube-proxy never syncs (stuck at "Waiting for caches
+# to sync"), no Service iptables rules get programmed, and calico-node's
+# install-cni container fails forever trying to reach the in-cluster
+# kubernetes ClusterIP (10.96.0.1) to fetch its token.
+- name: Point the control-plane endpoint hostname at localhost on this master
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    line: "127.0.0.1 {{ control_plane_host }}"
+    create: true
+
+# ── Monitoring agent ─────────────────────────────────────────────────────────
+# Already apt-installed by the master userdata; this just guarantees it's
+# running (matches the equivalent task in ansible/roles/master).
+
+- name: Enable and start node_exporter
+  ansible.builtin.systemd:
+    name: prometheus-node-exporter
+    state: started
+    enabled: true
+
+# open-iscsi is a Longhorn prerequisite (its engine needs iscsid), and isn't
+# installed by the userdata -- unlike node_exporter/containerd/kubeadm.
+- name: Install open-iscsi (Longhorn prerequisite)
+  ansible.builtin.apt:
+    name: open-iscsi
+    state: present
+    update_cache: true
+
+- name: Enable and start iscsid
+  ansible.builtin.systemd:
+    name: iscsid
+    state: started
+    enabled: true
+
+# ── Check cluster state on each node ─────────────────────────────────────────
+
+- name: Check if node is already part of the cluster
+  ansible.builtin.stat:
+    path: /etc/kubernetes/admin.conf
+  register: k8s_initialized
+
+# ── First master: init ────────────────────────────────────────────────────────
+# master_count is pinned to 1 in terrafrom-amazone (see root variables.tf),
+# so groups['k8s_master_servers'] only ever has one host today -- this is
+# still written as "first master" / "additional masters" to match the
+# Hetzner project's role and stay correct if that ever changes.
+
+- name: Deploy kubeadm config
+  ansible.builtin.template:
+    src: kubeadm-config.yaml.j2
+    dest: /etc/kubernetes/kubeadm-config.yaml
+    mode: '0644'
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_initialized.stat.exists
+
+- name: Initialize Kubernetes
+  ansible.builtin.command: kubeadm init --config /etc/kubernetes/kubeadm-config.yaml
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_initialized.stat.exists
+
+- name: Create kube dir
+  ansible.builtin.file:
+    path: /root/.kube
+    state: directory
+    mode: '0700'
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_initialized.stat.exists
+
+- name: Copy admin.conf
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /root/.kube/config
+    remote_src: true
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - not k8s_initialized.stat.exists
+
+# kubeadm's own CLI calls (upload-certs, token create) hit the same NLB
+# self-hairpin as kube-proxy/calico-node -- but unlike those, this is
+# fixed by the /etc/hosts task above, not a separate kubeconfig: kubeadm
+# and kubectl run as plain processes in the host network namespace, so
+# they resolve the NLB hostname via /etc/hosts too and land on the local
+# apiserver transparently. Deliberately still using the real
+# admin.conf/NLB hostname (not a 127.0.0.1-rewritten copy) here: `kubeadm
+# token create --print-join-command` embeds whatever host string the
+# --kubeconfig it's given resolves *as text*, not the cluster's recorded
+# controlPlaneEndpoint -- pointing it at a literal 127.0.0.1 kubeconfig
+# earlier produced a join command that said "join 127.0.0.1:6443", which
+# is meaningless on the worker that has to run it.
+- name: Upload control-plane certs and capture certificate key
+  ansible.builtin.command: kubeadm init phase upload-certs --upload-certs
+  register: upload_certs_output
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+
+- name: Generate join command
+  ansible.builtin.command: kubeadm token create --print-join-command
+  register: join_command
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+
+- name: Share join commands with all hosts
+  ansible.builtin.set_fact:
+    kube_join_command: "{{ join_command.stdout }}"
+    kube_control_plane_join_command: >-
+      {{ join_command.stdout }}
+      --control-plane
+      --certificate-key {{ upload_certs_output.stdout_lines[-1] }}
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+
+- name: Install Calico
+  # kubectl apply is idempotent -- deliberately NOT gated on
+  # k8s_initialized (unlike init/copy-admin-conf above), so a rerun
+  # after a mid-play failure (e.g. the NLB-hairpin issue /etc/hosts
+  # above works around) still applies it instead of skipping forever
+  # just because admin.conf already exists from the earlier partial run.
+  ansible.builtin.command: kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+
+# ── Additional masters: join as control-plane ─────────────────────────────────
+
+- name: Join additional masters as control-plane nodes
+  ansible.builtin.command: "{{ hostvars[groups['k8s_master_servers'][0]]['kube_control_plane_join_command'] }}"
+  when:
+    - inventory_hostname != groups['k8s_master_servers'][0]
+    - not k8s_initialized.stat.exists
+
+- name: Create kube dir on additional masters
+  ansible.builtin.file:
+    path: /root/.kube
+    state: directory
+    mode: '0700'
+  when:
+    - inventory_hostname != groups['k8s_master_servers'][0]
+    - not k8s_initialized.stat.exists
+
+- name: Copy admin.conf on additional masters
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /root/.kube/config
+    remote_src: true
+  when:
+    - inventory_hostname != groups['k8s_master_servers'][0]
+    - not k8s_initialized.stat.exists
+
+# Cluster is left here for this play. Waiting for node readiness and
+# installing Longhorn happen in the "Deploy storage" play (roles/k8s-addons)
+# after workers have joined -- Longhorn pods have no control-plane
+# toleration and would hang Pending forever if applied while only tainted
+# master nodes exist in the cluster.

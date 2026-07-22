@@ -1,0 +1,109 @@
+---
+- name: Ensure mc (minio client) is installed on the master
+  ansible.builtin.get_url:
+    url: https://dl.min.io/client/mc/release/linux-amd64/mc
+    dest: /usr/local/bin/mc
+    mode: '0755'
+  when: inventory_hostname == groups['k8s_master_servers'][0]
+
+- name: Read the backup-s3-secret values from the cluster
+  ansible.builtin.command: >-
+    kubectl get secret backup-s3-secret -n guacamole -o jsonpath={.data.{{ item }}}
+  register: s3_secret_raw
+  loop: [endpoint, access-key, secret-key]
+  changed_when: false
+  no_log: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when: inventory_hostname == groups['k8s_master_servers'][0]
+
+- name: Read the postgres-secret values from the cluster
+  ansible.builtin.command: >-
+    kubectl get secret postgres-secret -n guacamole -o jsonpath={.data.{{ item }}}
+  register: pg_secret_raw
+  loop: [postgres-user, postgres-password, postgres-db]
+  changed_when: false
+  no_log: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when: inventory_hostname == groups['k8s_master_servers'][0]
+
+- name: Decode credentials
+  ansible.builtin.set_fact:
+    s3_endpoint: "{{ s3_secret_raw.results[0].stdout | b64decode }}"
+    s3_access_key: "{{ s3_secret_raw.results[1].stdout | b64decode }}"
+    s3_secret_key: "{{ s3_secret_raw.results[2].stdout | b64decode }}"
+    pg_user: "{{ pg_secret_raw.results[0].stdout | b64decode }}"
+    pg_password: "{{ pg_secret_raw.results[1].stdout | b64decode }}"
+    pg_db: "{{ pg_secret_raw.results[2].stdout | b64decode }}"
+  no_log: true
+  when: inventory_hostname == groups['k8s_master_servers'][0]
+
+- name: Configure the mc alias for the backup bucket
+  ansible.builtin.command: >-
+    mc alias set backup-target {{ s3_endpoint }} {{ s3_access_key }} {{ s3_secret_key }}
+  changed_when: false
+  no_log: true
+  when: inventory_hostname == groups['k8s_master_servers'][0]
+
+# roles/master/files/06-backup-cronjob.yaml uploads under an "aws/" prefix in
+# the same guacamole-backup-dev bucket the Hetzner project uses, so Hetzner
+# and AWS nightly dumps never collide -- restore has to search that same
+# prefix here, not the bucket root ansible/roles/db-restore searches.
+- name: Find the newest guacdb-*.sql.gz backup
+  ansible.builtin.shell: >-
+    mc find backup-target/guacamole-backup-dev/aws/ --name "guacdb-*.sql.gz" | sort | tail -n1
+  register: latest_backup
+  changed_when: false
+  when: inventory_hostname == groups['k8s_master_servers'][0]
+
+- name: Fail if no backup was found
+  ansible.builtin.fail:
+    msg: "No guacdb-*.sql.gz backup found in guacamole-backup-dev/aws/."
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - latest_backup.stdout | trim == ''
+
+- name: Download the latest backup to the master
+  ansible.builtin.command: "mc cp {{ latest_backup.stdout | trim }} /tmp/guacdb-latest.sql.gz"
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - latest_backup.stdout | trim != ''
+
+# The nightly pg_dump (roles/master/files/06-backup-cronjob.yaml) is a plain
+# dump with no --clean/--if-exists, so replaying it on top of the
+# init-db-Job-seeded schema (tables + default guacadmin row already present)
+# would fail on duplicate-key/relation-already-exists errors. Dropping and
+# recreating the public schema first guarantees a clean target every time.
+# pg_user is the POSTGRES_USER the postgres container itself bootstrapped
+# with (roles/master/files/01-postgres.yaml), i.e. already a superuser/owner
+# here, so it can drop/recreate public without extra grants.
+- name: Drop and recreate the public schema before restore
+  ansible.builtin.shell: >-
+    kubectl exec -n guacamole deploy/postgres --
+    env PGPASSWORD={{ pg_password }} psql -U {{ pg_user }} -d {{ pg_db }}
+    -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+  no_log: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - latest_backup.stdout | trim != ''
+
+- name: Restore the backup directly into the running postgres pod
+  ansible.builtin.shell: >-
+    gunzip -c /tmp/guacdb-latest.sql.gz |
+    kubectl exec -i -n guacamole deploy/postgres --
+    env PGPASSWORD={{ pg_password }} psql -U {{ pg_user }} -d {{ pg_db }}
+  no_log: true
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when:
+    - inventory_hostname == groups['k8s_master_servers'][0]
+    - latest_backup.stdout | trim != ''
+
+- name: Clean up the downloaded backup file
+  ansible.builtin.file:
+    path: /tmp/guacdb-latest.sql.gz
+    state: absent
+  when: inventory_hostname == groups['k8s_master_servers'][0]
