@@ -3,7 +3,8 @@
 # Provisions the AWS self-managed cluster (aws_terrafrom) and deploys
 # Kubernetes + Guacamole + the Vault AppRole secret_id onto it
 # (ansible-amazon/site.yml, tags k8s_cluster + k8s_vault -- both always run,
-# see VAULT_ROLE_ID/VAULT_SECRET_ID check below).
+# see VAULT_ROLE_ID/VAULT_SECRET_ID check below). AWS counterpart to
+# hzn_guacamole_bootstrap.sh.
 #
 # Unlike the Hetzner workflow (generate_inventory.sh writing a static
 # inventory.ini from tf_output.json), the worker ASG here has no stable IP
@@ -25,7 +26,7 @@ set -e
 TF_DIR="/home/jilani/playsoft-jilani-gharbi/playsoft-infra/aws_terrafrom"
 ANSIBLE_DIR="/home/jilani/playsoft-jilani-gharbi/playsoft-infra/ansible-amazon"
 
-# Terraform variables file (override with: TFVARS_FILE=env/prod.tfvars ./deploy_aws.sh)
+# Terraform variables file (override with: TFVARS_FILE=env/prod.tfvars ./aws_bootstrap_guacamole.sh)
 TFVARS_FILE="${TFVARS_FILE:-env/dev.tfvars}"
 
 # Vault AppRole bootstrap credentials -- required by the k8s_vault tag
@@ -58,7 +59,24 @@ terraform output -json > tf_output.json
 
 BASTION_IP=$(jq -r '.bastion_public_ip.value' tf_output.json)
 CP_ENDPOINT=$(jq -r '.control_plane_endpoint.value' tf_output.json)
+ALB_DNS=$(jq -r '.alb_dns_name.value' tf_output.json)
 echo "✅ Terraform apply completed. bastion=${BASTION_IP} control_plane=${CP_ENDPOINT}"
+
+# -------------------------------------------------------------------
+#          LET THE NAT GATEWAY'S DATA PATH SETTLE
+# -------------------------------------------------------------------
+# Master/worker userdata starts installing packages (apt, pkgs.k8s.io)
+# within seconds of boot -- if the apply above just created the NAT
+# gateway, its API status flips to "available" well before its data
+# path actually forwards traffic. Seen live: NAT created at T+0,
+# instance egress still fully unreachable at T+70s, causing apt-get/curl
+# in the userdata to fail outright and cloud-init to record a permanent
+# error status for that boot. Terraform has no resource to wait on for
+# this, so it's a plain sleep -- costs nothing on a run where the NAT
+# already existed, cheap insurance against a failed userdata run on one
+# where it didn't.
+echo "⏳ Letting the NAT gateway settle before instances hit the internet..."
+sleep 90
 
 # -------------------------------------------------------------------
 #          WAIT FOR MASTER/WORKER INSTANCES TO APPEAR IN AWS
@@ -110,3 +128,4 @@ ansible-playbook -i inventory/aws_ec2.yml site.yml --tags k8s_cluster,k8s_vault
 echo "🎉 Deployment complete!"
 echo "   SSH to bastion:    ssh -i ~/.ssh/jilani ubuntu@${BASTION_IP}"
 echo "   Control plane:     ${CP_ENDPOINT}"
+echo "   Guacamole:         http://${ALB_DNS}/guacamole/  (guacadmin/guacadmin -- change it)"
