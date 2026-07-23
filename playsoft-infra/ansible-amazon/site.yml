@@ -1,8 +1,25 @@
 ---
 # Kubernetes cluster bootstrap for the AWS self-managed cluster
-# (terrafrom-amazone). Cluster + storage + the Guacamole app layer, mirroring
-# ansible/ (Hetzner) and reusing its same Vault backend/AppRole. Still no
-# monitoring stack or autoscaler here -- those stay Hetzner-only for now.
+# (aws_terrafrom). Cluster + storage + the Guacamole app layer, mirroring
+# ansible/ (Hetzner) and reusing its same Vault backend/AppRole. Monitoring
+# (Prometheus + Grafana) runs on its own dedicated server -- kept off the
+# bastion so it isn't affected by autoscaler/webhook changes and vice versa.
+# Same split as the Hetzner project's site.yml.
+
+- name: Deploy autoscaler stack on bastion
+  hosts: bastion
+  become: true
+  tags: [autoscaler]
+  roles:
+    - autoscaler
+
+- name: Deploy Prometheus + Grafana on the monitoring server
+  hosts: monitoring
+  become: true
+  tags: [monitoring, prometheus, grafana]
+  roles:
+    - prometheus
+    - grafana
 
 - name: Configure Kubernetes nodes (common)
   hosts: k8s_nodes

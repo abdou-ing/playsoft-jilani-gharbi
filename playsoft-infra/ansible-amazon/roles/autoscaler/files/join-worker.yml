@@ -1,0 +1,36 @@
+---
+# Standalone playbook the autoscaler webhook runs directly (ansible-playbook
+# -i <throwaway inventory> join-worker.yml), NOT via site.yml --limit.
+#
+# site.yml --limit <new-worker> would break outright: the worker role's join
+# task reads hostvars[groups['k8s_master_servers'][0]].kube_join_command, a
+# set_fact only computed when the master play runs in the SAME invocation --
+# --limit excludes the master from every play (limit intersects all plays).
+# Including the master in the limit instead would re-run the entire master
+# role (kubeadm-init idempotency checks, k8s-addons) against a live control
+# plane on every scale-out -- far higher blast radius than this.
+#
+# So: a lightweight standalone token-generation step (matching the Hetzner
+# project's own playsoft-infra/prometheus/ansible/join-worker.yml shape
+# exactly), then reuse ansible-amazon's own common+worker roles verbatim for
+# the actual join -- not reimplemented, so this gets the NAT-gateway-race-
+# aware cloud-init wait (roles/common) for free.
+- name: Get join command from master
+  hosts: k8s_master_servers
+  become: true
+  tasks:
+    - name: Generate fresh join token
+      ansible.builtin.command: kubeadm token create --print-join-command
+      register: join_command
+      changed_when: true
+
+    - name: Share join command with the play
+      ansible.builtin.set_fact:
+        kube_join_command: "{{ join_command.stdout }}"
+
+- name: Configure and join new worker
+  hosts: new_workers
+  become: true
+  roles:
+    - common
+    - worker

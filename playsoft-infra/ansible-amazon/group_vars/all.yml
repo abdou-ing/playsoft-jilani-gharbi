@@ -8,6 +8,9 @@
 # after every apply, then this file reads it back.
 _tf: "{{ lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/aws_terrafrom/tf_output.json') | from_json }}"
 bastion_public_ip: "{{ _tf.bastion_public_ip.value }}"
+# Alertmanager runs on the bastion (roles/autoscaler); Prometheus (on the
+# separate monitoring host) needs this to know where to send alerts.
+bastion_private_ip: "{{ _tf.bastion_private_ip.value }}"
 
 # The master's own fixed private IP ("host:6443") -- see
 # modules/k8s-master/main.tf (aws_instance.master, pinned var.master_private_ip).
@@ -17,6 +20,21 @@ control_plane_endpoint: "{{ _tf.control_plane_endpoint.value }}"
 control_plane_host: "{{ control_plane_endpoint.split(':')[0] }}"
 
 kubernetes_version: "v1.35.5"
+
+# Mirrors aws_terrafrom/env/dev.tfvars -- these are Terraform *inputs*
+# (project, cluster_name, region), not outputs, so tf_output.json doesn't
+# carry them. Used by roles/prometheus's alerts.yml.j2 (nodename regex) and
+# roles/autoscaler's webhook.py.j2/terraform.tfvars.j2 (AWS API filters,
+# worker naming). Keep in sync with dev.tfvars if that ever changes.
+project:      "jilani-k8s-selfmanaged"
+cluster_name: "guacamole"
+aws_region:   "us-east-1"
+
+# Same reasoning -- Terraform inputs, not outputs. roles/autoscaler needs
+# these to provision extra workers identically to the floor worker.
+autoscaler_worker_instance_type: "t3.large"
+autoscaler_ami_id: ""
+autoscaler_ssh_key_name: "jilani"
 
 # ─────────────────────────────────────────────────────────────
 # Same Vault AppRole/backend as the Hetzner project (ansible/group_vars/all.yml)

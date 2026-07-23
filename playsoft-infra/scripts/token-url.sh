@@ -10,7 +10,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 PROJECT_ROOT="/home/jilani/playsoft-jilani-gharbi/playsoft-infra"
-TF_OUTPUT="${PROJECT_ROOT}/terraform-k8s/tf_output.json"
+TF_OUTPUT="${PROJECT_ROOT}/terraform-hzn/tf_output.json"
 ANSIBLE_VARS="${PROJECT_ROOT}/ansible/group_vars/all.yml"
 
 # Helper: read a top-level scalar from all.yml

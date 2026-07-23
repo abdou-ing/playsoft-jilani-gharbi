@@ -8,7 +8,7 @@ set -e
 # -------------------------------------------------------------------
 
 # Terraform directory
-TF_DIR="/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s"
+TF_DIR="/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terraform-hzn"
 
 # Ansible directory
 ANSIBLE_DIR="/home/jilani/playsoft-jilani-gharbi/playsoft-infra/ansible"

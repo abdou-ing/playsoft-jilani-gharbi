@@ -3,7 +3,7 @@
 # Shared / global variables available to all hosts
 # ──────────────────────────────────────────────
 
-_tf: "{{ lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json') | from_json }}"
+_tf: "{{ lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terraform-hzn/tf_output.json') | from_json }}"
 bastion_ip: "{{ _tf.bastion_public_ip.value }}"
 k8s_master_ips: "{{ _tf.k8s_master_private_ips.value }}"
 k8s_worker_ips: "{{ _tf.k8s_worker_private_ips.value }}"
@@ -18,7 +18,7 @@ k8s_lb_public_ip: "{{ _tf.load_balancer_public_ip.value }}"
 # (Vault's AppRole security model puts the actual credential in secret_id
 # only), so it's fine as a plain value here.
 # ─────────────────────────────────────────────────────────────
-vault_approle_role_id: "<VAULT_ROLE_ID>"  # `vault read auth/jilani-approle/role/ansible_instalab/role-id`
+vault_approle_role_id: "ea989d3f-4b56-2c56-5b8f-187753cb1174"  # `vault read auth/jilani-approle/role/ansible_instalab/role-id`
 vault_approle_k8s_secret_name: "vault-approle-creds"
 
 # Guacamole route name

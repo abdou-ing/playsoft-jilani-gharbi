@@ -45,6 +45,16 @@ module "k8s_master" {
   master_instance_type      = var.master_instance_type
   ssh_key_name              = var.ssh_key_name
   ami_id                    = var.ami_id
+
+  # Instances here boot in the private subnet and their userdata needs real
+  # internet egress within the first couple minutes (apt, pkgs.k8s.io). The
+  # instance only references module.network's subnet_id output, which
+  # doesn't order it after the NAT gateway/private route table association
+  # (separate resources in the same module) -- without this, Terraform can
+  # launch the instance before that route is actually wired up, racing
+  # cloud-init against NAT settling. See roles/common's egress-check/replay
+  # recovery in ansible-amazon for the runtime-side mitigation.
+  depends_on = [module.network]
 }
 
 module "monitoring" {
@@ -78,6 +88,9 @@ module "k8s_worker" {
   worker_private_ip         = var.worker_private_ip
   ssh_key_name              = var.ssh_key_name
   ami_id                    = var.ami_id
+
+  # Same private-subnet NAT-settling race as k8s_master above.
+  depends_on = [module.network]
 }
 
 ############################################

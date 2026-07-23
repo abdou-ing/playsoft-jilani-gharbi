@@ -5,7 +5,7 @@
   tasks:
     - name: Load Terraform output
       set_fact:
-        tf: "{{ lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json') | from_json }}"
+        tf: "{{ lookup('file', '/home/jilani/playsoft-jilani-gharbi/playsoft-infra/terraform-hzn/tf_output.json') | from_json }}"
 
     - name: Derive VM IDs and IPs
       set_fact:

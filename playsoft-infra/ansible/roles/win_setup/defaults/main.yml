@@ -1,6 +1,6 @@
 ---
 # Path to the Terraform output JSON
-tf_output_path: "~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json"
+tf_output_path: "~/playsoft-jilani-gharbi/playsoft-infra/terraform-hzn/tf_output.json"
 
 # External port used to expose the first Windows VM over Proxmox NAT.
 win_rdp_base_port: 3301

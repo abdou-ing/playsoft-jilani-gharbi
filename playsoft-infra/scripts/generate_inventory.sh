@@ -1,11 +1,11 @@
 #!/bin/bash
-# Auto-generates ansible/inventory.ini from terraform-k8s/tf_output.json.
+# Auto-generates ansible/inventory.ini from terraform-hzn/tf_output.json.
 # Handles any number of masters and workers.
 
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TF_OUTPUT="${PROJECT_ROOT}/terraform-k8s/tf_output.json"
+TF_OUTPUT="${PROJECT_ROOT}/terraform-hzn/tf_output.json"
 INVENTORY="${PROJECT_ROOT}/ansible/inventory.ini"
 
 if [ ! -f "${TF_OUTPUT}" ]; then
@@ -35,7 +35,7 @@ WORKER_COUNT=$(jq -r '.k8s_worker_private_ips.value | length' "${TF_OUTPUT}")
   echo "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
   echo ""
   echo "[proxmox]"
-  echo "playsoft-proxmox ansible_host=<PROXMOX_HOST> ansible_user=<SERVER_USER> ansible_ssh_private_key_file=/home/jilani/.ssh/jilani"
+  echo "playsoft-proxmox ansible_host=138.201.200.168 ansible_user=abdou ansible_ssh_private_key_file=/home/jilani/.ssh/jilani"
   echo ""
   echo "[k8s_master_servers]"
   for i in $(seq 0 $((MASTER_COUNT - 1))); do

@@ -1,0 +1,16 @@
+---
+alertmanager_version: "0.27.0"
+
+infra_dir: /opt/infra/autoscaler
+autoscaler_env_dir: /etc/autoscaler
+ssh_key_path: /root/.ssh/jilani
+ssh_key_local_path: "{{ lookup('env', 'HOME') }}/.ssh/jilani"
+
+# Email alerting. smtp_auth_password is NOT here -- it's exported as
+# SMTP_AUTH_PASSWORD on the control node and read directly by
+# templates/alertmanager.yml.j2 (same pattern as WEBHOOK_SHARED_SECRET /
+# AWS credentials), so it's never written to a file that gets committed.
+smtp_smarthost: "smtp.gmail.com:587"
+smtp_from: "gharbijilani001@gmail.com"
+smtp_auth_username: "gharbijilani001@gmail.com"
+alert_email_to: "jilanigharbi88@gmail.com"

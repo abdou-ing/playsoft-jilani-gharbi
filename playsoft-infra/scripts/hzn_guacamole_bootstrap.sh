@@ -46,11 +46,11 @@ echo "✅ Packer build for k8s-cluster completed."
 # -------------------------------------------------------------------
 echo "🌍 Running Terraform for Hetzner servers..."
 
-cd ~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s
+cd ~/playsoft-jilani-gharbi/playsoft-infra/terraform-hzn
 
-terraform apply -var-file=env/dev.tfvars -auto-approve
+#terraform apply -var-file=env/dev.tfvars -auto-approve
 
-cd ~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s
+cd ~/playsoft-jilani-gharbi/playsoft-infra/terraform-hzn
 
 echo "📥 Exporting Terraform outputs to JSON..."
 terraform output -json > tf_output.json
@@ -69,8 +69,8 @@ bash ~/playsoft-jilani-gharbi/playsoft-infra/scripts/generate_inventory.sh
 
 echo "🌍 Running Ansible playbook for full configuration..."
 cd ~/playsoft-jilani-gharbi/playsoft-infra/ansible
-ansible-playbook site.yml  --tags "autoscaler,prometheus,grafana,access_setup,k8s_cluster,k8s_vault,guacamole_connection,guacamole_url"
 
+ansible-playbook site.yml  --tags "autoscaler,prometheus,grafana,access_setup,k8s_cluster,k8s_vault,guacamole_connection,guacamole_url"
 
 
 

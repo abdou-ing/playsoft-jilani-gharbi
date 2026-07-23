@@ -1,0 +1,330 @@
+---
+# ── 0. Pre-flight ──────────────────────────────────────────────────────────
+
+- name: Assert AWS credentials are set on control node
+  ansible.builtin.assert:
+    that:
+      - lookup('env', 'AWS_ACCESS_KEY_ID') != ''
+      - lookup('env', 'AWS_SECRET_ACCESS_KEY') != ''
+    fail_msg: >-
+      Export AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY before running: these
+      become the bastion's own credentials for the `aws` CLI and Terraform
+      (no instance IAM role is possible in this account -- see
+      aws_terrafrom/README.md).
+
+- name: Assert WEBHOOK_SHARED_SECRET is set on control node
+  ansible.builtin.assert:
+    that: lookup('env', 'WEBHOOK_SHARED_SECRET') != ''
+    fail_msg: >-
+      Export WEBHOOK_SHARED_SECRET before running: export WEBHOOK_SHARED_SECRET=<random-value>
+      (e.g. `openssl rand -hex 32`). Without it the webhook refuses to start — anyone who could
+      reach its port would otherwise be able to trigger scale-out/scale-in unauthenticated.
+
+- name: Assert SMTP_AUTH_PASSWORD is set on control node
+  ansible.builtin.assert:
+    that: lookup('env', 'SMTP_AUTH_PASSWORD') != ''
+    fail_msg: >-
+      Export SMTP_AUTH_PASSWORD before running: export SMTP_AUTH_PASSWORD=<gmail-app-password>.
+      Never commit this value -- it's read directly from the environment when
+      alertmanager.yml is templated.
+
+# ── 1. HashiCorp APT repo (required for Terraform) ────────────────────────
+
+- name: Install prerequisites for HashiCorp repo
+  ansible.builtin.apt:
+    name: [apt-transport-https, gnupg, lsb-release, wget, unzip]
+    state: present
+    update_cache: true
+
+- name: Download HashiCorp GPG key
+  ansible.builtin.get_url:
+    url: https://apt.releases.hashicorp.com/gpg
+    dest: /tmp/hashicorp.gpg
+    mode: '0644'
+
+- name: Dearmor HashiCorp GPG key
+  ansible.builtin.command:
+    cmd: gpg --batch --yes --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg /tmp/hashicorp.gpg
+    creates: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+- name: Add HashiCorp APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com {{ ansible_lsb.codename }} main"
+    state: present
+    filename: hashicorp
+
+# ── 2. Install packages ─────────────────────────────────────────────────────
+# Prometheus itself lives on the monitoring server (see roles/prometheus) --
+# this host only needs ansible/terraform/aws-cli to drive worker scaling.
+
+- name: Install ansible, terraform, python3
+  ansible.builtin.apt:
+    name:
+      - ansible
+      - terraform
+      - python3
+    state: present
+    update_cache: true
+
+- name: Check whether the AWS CLI v2 is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/aws
+  register: aws_cli_bin
+
+- name: Download AWS CLI v2 installer
+  ansible.builtin.get_url:
+    url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+    dest: /tmp/awscliv2.zip
+    mode: '0644'
+  when: not aws_cli_bin.stat.exists
+
+- name: Unzip AWS CLI v2 installer
+  ansible.builtin.unarchive:
+    src: /tmp/awscliv2.zip
+    dest: /tmp
+    remote_src: true
+  when: not aws_cli_bin.stat.exists
+
+- name: Install AWS CLI v2
+  ansible.builtin.command: /tmp/aws/install
+  when: not aws_cli_bin.stat.exists
+
+# ── 3. Install Alertmanager binary (not in apt) ─────────────────────────────
+
+- name: Download Alertmanager tarball
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/alertmanager/releases/download/v{{ alertmanager_version }}/alertmanager-{{ alertmanager_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/alertmanager-{{ alertmanager_version }}.tar.gz"
+    mode: '0644'
+
+- name: Extract Alertmanager
+  ansible.builtin.unarchive:
+    src: "/tmp/alertmanager-{{ alertmanager_version }}.tar.gz"
+    dest: /tmp/
+    remote_src: true
+
+- name: Install alertmanager binary
+  ansible.builtin.copy:
+    src: "/tmp/alertmanager-{{ alertmanager_version }}.linux-amd64/alertmanager"
+    dest: /usr/local/bin/alertmanager
+    mode: '0755'
+    remote_src: true
+
+- name: Create alertmanager data directory
+  ansible.builtin.file:
+    path: /var/lib/alertmanager/data
+    state: directory
+    mode: '0755'
+
+# ── 4. Token security ────────────────────────────────────────────────────────
+
+- name: Create autoscaler env directory (mode 0700 — root only)
+  ansible.builtin.file:
+    path: "{{ autoscaler_env_dir }}"
+    state: directory
+    mode: '0700'
+
+- name: Create autoscaler scratch directory for tfvars/inventory temp files (mode 0700)
+  ansible.builtin.file:
+    path: "{{ autoscaler_env_dir }}/run"
+    state: directory
+    mode: '0700'
+
+- name: Write AWS credentials and WEBHOOK_SHARED_SECRET to env file (mode 0600)
+  ansible.builtin.copy:
+    content: |
+      AWS_ACCESS_KEY_ID={{ lookup('env', 'AWS_ACCESS_KEY_ID') }}
+      AWS_SECRET_ACCESS_KEY={{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}
+      AWS_DEFAULT_REGION={{ aws_region }}
+      WEBHOOK_SHARED_SECRET={{ lookup('env', 'WEBHOOK_SHARED_SECRET') }}
+      MONITORING_HOST={{ _tf.monitoring_private_ip.value }}
+    dest: "{{ autoscaler_env_dir }}/env"
+    mode: '0600'
+  no_log: true
+
+# ── 5. Directory tree on bastion ─────────────────────────────────────────────
+
+- name: Create infra directory tree
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ infra_dir }}"
+    - "{{ infra_dir }}/webhook"
+    - "{{ infra_dir }}/ansible"
+    - "{{ infra_dir }}/terraform"
+    - "{{ infra_dir }}/terraform/userdata"
+    # Shared with roles/prometheus / roles/grafana's staging copies (targets.json,
+    # alertmanager.yml, the k8s-guacamole dashboard) -- matches the Hetzner
+    # project's single shared infra_dir convention for these specific files.
+    - /opt/infra/prometheus/config
+
+# ── 6. Source files ──────────────────────────────────────────────────────────
+
+- name: Create initial targets.json (skipped if file already exists)
+  ansible.builtin.copy:
+    content: "[]"
+    dest: /opt/infra/prometheus/config/targets.json
+    force: false
+
+- name: Template webhook.py
+  ansible.builtin.template:
+    src: webhook.py.j2
+    dest: "{{ infra_dir }}/webhook/webhook.py"
+    mode: '0755'
+  vars:
+    monitoring_private_ip: "{{ _tf.monitoring_private_ip.value }}"
+    region: "{{ aws_region }}"
+    private_subnet_cidr_prefix: "{{ _tf.worker_private_ip.value.rsplit('.', 1)[0] }}"
+  notify: restart autoscaler
+
+- name: Copy join-worker playbook
+  ansible.builtin.copy:
+    src: join-worker.yml
+    dest: "{{ infra_dir }}/ansible/join-worker.yml"
+    mode: '0644'
+
+# join-worker.yml's `roles: [common, worker]` resolves against a roles/
+# subdirectory next to the playbook (ansible's default role search path) --
+# these roles live in ansible-amazon/roles/, not staged alongside it, so
+# they have to be mirrored here too. Re-copied on every run of this role
+# (plain ansible.builtin.copy, no extra collection dependency), so they
+# can't drift stale the way a one-time manual copy could. A trailing slash
+# on src copies the directory's *contents*, not the directory itself.
+- name: Remove any previous copy of the common/worker roles (avoids stale leftover files)
+  ansible.builtin.file:
+    path: "{{ infra_dir }}/ansible/roles/{{ item }}"
+    state: absent
+  loop: [common, worker]
+
+- name: Sync the common + worker roles to the bastion (join-worker.yml dependencies)
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/roles/{{ item }}/"
+    dest: "{{ infra_dir }}/ansible/roles/{{ item }}/"
+    mode: preserve
+  loop: [common, worker]
+
+- name: Copy staged Terraform root files (worker for_each + target group attachment)
+  ansible.builtin.copy:
+    src: "terraform/{{ item }}"
+    dest: "{{ infra_dir }}/terraform/{{ item }}"
+  loop:
+    - main.tf
+    - variables.tf
+    - outputs.tf
+    - provider.tf
+  notify: restart autoscaler
+
+# Copied from the real source, not duplicated in git -- this is the exact
+# same script the floor worker's userdata runs (aws_terrafrom/modules/
+# k8s-worker/userdata/worker.sh), so there's one source of truth for what a
+# worker's first boot does, not two scripts that can drift apart.
+- name: Copy the real worker userdata script (single source of truth)
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../aws_terrafrom/modules/k8s-worker/userdata/worker.sh"
+    dest: "{{ infra_dir }}/terraform/userdata/worker.sh"
+    mode: '0644'
+  notify: restart autoscaler
+
+- name: Template terraform.tfvars (resolved AWS resource IDs from tf_output.json)
+  ansible.builtin.template:
+    src: terraform.tfvars.j2
+    dest: "{{ infra_dir }}/terraform/terraform.tfvars"
+    mode: '0644'
+  vars:
+    region: "{{ aws_region }}"
+    ami_id: "{{ autoscaler_ami_id }}"
+    worker_instance_type: "{{ autoscaler_worker_instance_type }}"
+    ssh_key_name: "{{ autoscaler_ssh_key_name }}"
+    app_nodeport: 30080
+
+# ── 7. Terraform init (downloads providers on bastion) ─────────────────────
+
+- name: Run terraform init
+  ansible.builtin.command:
+    cmd: terraform init -input=false
+    chdir: "{{ infra_dir }}/terraform"
+  register: tf_init
+  changed_when: "'Terraform has been successfully initialized' in tf_init.stdout"
+
+# ── 7b. Terraform state bootstrap (only on first deploy) ───────────────────
+
+- name: Check if terraform state file exists
+  ansible.builtin.stat:
+    path: "{{ infra_dir }}/terraform/terraform.tfstate"
+  register: tf_state
+
+- name: Bootstrap terraform state with no autoscaler-managed workers (first deploy only)
+  ansible.builtin.command:
+    cmd: terraform apply -auto-approve -input=false -var-file=terraform.tfvars -var='workers={}'
+    chdir: "{{ infra_dir }}/terraform"
+  when: not tf_state.stat.exists
+
+# ── 8. SSH key for webhook.py to reach workers/master ───────────────────────
+
+- name: Ensure /root/.ssh exists on bastion
+  ansible.builtin.file:
+    path: /root/.ssh
+    state: directory
+    mode: '0700'
+
+- name: Ensure /root/.ansible exists on bastion (needs to be writable under ProtectHome=read-only)
+  ansible.builtin.file:
+    path: /root/.ansible
+    state: directory
+    mode: '0700'
+
+- name: Copy SSH private key to bastion
+  ansible.builtin.copy:
+    src: "{{ ssh_key_local_path }}"
+    dest: "{{ ssh_key_path }}"
+    mode: '0600'
+  no_log: true
+
+# ── 9. Template alertmanager config ──────────────────────────────────────────
+
+- name: Deploy alertmanager.yml from template
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: /opt/infra/prometheus/config/alertmanager.yml
+    mode: '0644'
+  notify: restart alertmanager
+
+# ── 10. Systemd units ────────────────────────────────────────────────────────
+
+- name: Deploy alertmanager systemd unit
+  ansible.builtin.copy:
+    src: alertmanager.service
+    dest: /etc/systemd/system/alertmanager.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart alertmanager
+
+- name: Deploy autoscaler systemd unit from template
+  ansible.builtin.template:
+    src: autoscaler.service.j2
+    dest: /etc/systemd/system/autoscaler.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart autoscaler
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+# ── 11. Enable and start remaining services ──────────────────────────────────
+
+- name: Enable and start alertmanager
+  ansible.builtin.systemd:
+    name: alertmanager
+    state: started
+    enabled: true
+
+- name: Enable and start autoscaler
+  ansible.builtin.systemd:
+    name: autoscaler
+    state: started
+    enabled: true

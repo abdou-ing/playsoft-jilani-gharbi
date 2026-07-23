@@ -12,6 +12,7 @@ compose:
 
 groups:
   bastion: "'k8s_role' in tags and tags.k8s_role == 'bastion'"
+  monitoring: "'k8s_role' in tags and tags.k8s_role == 'monitoring'"
   k8s_master_servers: "'k8s_role' in tags and tags.k8s_role == 'master'"
   k8s_workers: "'k8s_role' in tags and tags.k8s_role == 'worker'"
   k8s_nodes: "'k8s_role' in tags and tags.k8s_role in ['master', 'worker']"

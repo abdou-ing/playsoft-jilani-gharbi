@@ -21,6 +21,11 @@ resource "hcloud_server" "edge" {
     ip         = var.edge_private_ip
     alias_ips = []
   }
+
+  labels = {
+    role       = "bastion"
+    created_by = "jilani"
+  }
 }
 
 # Firewall

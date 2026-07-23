@@ -1,0 +1,57 @@
+[Unit]
+Description=Kubernetes Autoscaler Webhook
+After=network.target prometheus.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory={{ infra_dir }}/webhook
+ExecStart=/usr/bin/python3 {{ infra_dir }}/webhook/webhook.py
+EnvironmentFile={{ autoscaler_env_dir }}/env
+Restart=on-failure
+RestartSec=10
+
+# Hardening: this still runs as root (it needs to SSH/terraform/kubectl as root
+# against cluster nodes), but these constrain what that root process can touch
+# on the bastion itself. Does NOT replace the access controls on the webhook
+# endpoint (auth header) — defense in depth, not a substitute.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+# /root/.ansible needs to be writable — ansible-playbook (run by this service to
+# join new workers) writes local temp/control-path files under
+# /root/.ansible/tmp, which ProtectHome=read-only would otherwise block. The
+# rest of /root (including the SSH private key) stays read-only. AWS
+# credentials are plain env vars via EnvironmentFile above (boto3/`aws` CLI
+# read AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY with zero filesystem writes) --
+# deliberately not a ~/.aws/credentials file, which would reopen this exact
+# ProtectHome=read-only bug class for a second credential type.
+# Note: the Grafana dashboard sync (_update_grafana_nodename_variable() in
+# webhook.py) only ever writes the bastion-local staging copy under
+# /opt/infra/prometheus/config — the actual /var/lib/grafana/dashboards file
+# lives on the separate monitoring host and is updated via scp/ssh
+# (_push_to_monitoring()), not a local filesystem write, so it has no
+# business being in this list.
+ReadWritePaths={{ infra_dir }} /opt/infra/prometheus {{ autoscaler_env_dir }} /root/.ansible
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+RemoveIPC=true
+# Every path this service actually writes to locally (infra_dir,
+# /opt/infra/prometheus, autoscaler_env_dir, /root/.ansible) is root-owned, so
+# owner permission bits already grant access with no capability needed --
+# safe to drop all of them.
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

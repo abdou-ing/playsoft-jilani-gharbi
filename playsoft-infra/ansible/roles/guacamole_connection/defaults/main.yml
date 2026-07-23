@@ -3,9 +3,9 @@
 auth_username: "bob"
 auth_password: "bob"
 
-# Single Terraform output JSON (terraform-k8s — contains bastion_public_ip + VM outputs)
-tf_output_path_root: "~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json"
-tf_output_path_proxmox: "~/playsoft-jilani-gharbi/playsoft-infra/terraform-k8s/tf_output.json"
+# Single Terraform output JSON (terraform-hzn — contains bastion_public_ip + VM outputs)
+tf_output_path_root: "~/playsoft-jilani-gharbi/playsoft-infra/terraform-hzn/tf_output.json"
+tf_output_path_proxmox: "~/playsoft-jilani-gharbi/playsoft-infra/terraform-hzn/tf_output.json"
 
 # Template config — auto-generates one user per VM
 user_prefix: "candidat"

@@ -1,0 +1,127 @@
+{% raw %}
+groups:
+  - name: node.cpu
+    rules:
+      - alert: NodeCPUWarning
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 70
+        for: 2m
+        labels:
+          severity: warning
+          team: Cloud DevSecOps
+        annotations:
+          summary: "High CPU — {{ $labels.nodename }}"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% (threshold: 70%) on node {{ $labels.nodename }} ({{ $labels.instance }}). Sustained high load may trigger auto scale-out."
+
+      - alert: WorkerAvgCPUCritical
+        # Averaged across worker nodes only -- the master never factors into
+        # the scale-out decision (scaling out workers doesn't relieve
+        # control-plane load, and a busy master shouldn't provision a
+        # worker it doesn't need).
+        expr: |
+{% endraw %}
+          avg(100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle", job="k8s-nodes", nodename=~"{{ project }}-worker-[0-9]+"}[2m])) * 100)) > 85
+{% raw %}
+        for: 2m
+        labels:
+          severity: critical
+          action: scale-out
+          team: Cloud DevSecOps
+        annotations:
+          summary: "Average worker CPU saturation → Scale-Out Triggered"
+          description: "Average CPU usage across all worker nodes has been {{ $value | printf \"%.1f\" }}% (threshold: 85%) for 2 minutes. A new worker node is being provisioned automatically."
+
+  - name: node.scaledown
+    rules:
+      - alert: WorkerAvgCPULow
+        # Same worker-only scope as WorkerAvgCPUCritical.
+        expr: |
+{% endraw %}
+          avg(100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle", job="k8s-nodes", nodename=~"{{ project }}-worker-[0-9]+"}[5m])) * 100)) < 20
+{% raw %}
+        for: 10m
+        labels:
+          severity: info
+          action: scale-in
+          team: Cloud DevSecOps
+        annotations:
+          summary: "Low Average Worker CPU — Scale-In Triggered"
+          description: "Average CPU across all worker nodes has been {{ $value | printf \"%.1f\" }}% (threshold: <20%) for 10 minutes. The most recently added autoscaler-managed worker will be removed to reduce costs."
+
+  - name: node.masterhealth
+    rules:
+      - alert: MasterAvgCPUWarning
+        # Visibility only -- no `action` label, so this routes to email,
+        # never to the autoscaler webhook. The master isn't scaled in this
+        # architecture (single control-plane, no etcd clustering).
+        expr: |
+{% endraw %}
+          avg(100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle", job="k8s-nodes", nodename=~"{{ project }}-master"}[5m])) * 100)) > 70
+{% raw %}
+        for: 5m
+        labels:
+          severity: warning
+          team: Cloud DevSecOps
+        annotations:
+          summary: "High control-plane CPU"
+          description: "CPU on the master has been {{ $value | printf \"%.1f\" }}% (threshold: 70%) for 5 minutes."
+
+  - name: node.availability
+    rules:
+      - alert: NodeDown
+        expr: up{job="k8s-nodes"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: Cloud DevSecOps
+        annotations:
+          summary: "Node Unreachable — {{ $labels.nodename }}"
+          description: "Node {{ $labels.nodename }} ({{ $labels.instance }}) has been unreachable for more than 1 minute. node_exporter is not responding. Immediate investigation required."
+
+  - name: node.memory
+    rules:
+      - alert: NodeMemoryWarning
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+          team: Cloud DevSecOps
+        annotations:
+          summary: "High Memory — {{ $labels.nodename }}"
+          description: "Memory usage is {{ $value | printf \"%.1f\" }}% (threshold: 80%) on node {{ $labels.nodename }} ({{ $labels.instance }})."
+
+      - alert: NodeMemoryCritical
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 2m
+        labels:
+          severity: critical
+          team: Cloud DevSecOps
+        annotations:
+          summary: "Critical Memory — {{ $labels.nodename }}"
+          description: "Memory usage is {{ $value | printf \"%.1f\" }}% (threshold: 90%) on node {{ $labels.nodename }} ({{ $labels.instance }}). OOM risk — immediate action required."
+
+  - name: node.disk
+    rules:
+      - alert: NodeDiskWarning
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!="tmpfs",mountpoint="/"} / node_filesystem_size_bytes{fstype!="tmpfs",mountpoint="/"})) * 100 > 75
+        for: 5m
+        labels:
+          severity: warning
+          team: Cloud DevSecOps
+        annotations:
+          summary: "Disk Filling — {{ $labels.nodename }}"
+          description: "Disk usage on / is {{ $value | printf \"%.1f\" }}% (threshold: 75%) on node {{ $labels.nodename }} ({{ $labels.instance }}). Plan cleanup or expansion soon."
+
+      - alert: NodeDiskCritical
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!="tmpfs",mountpoint="/"} / node_filesystem_size_bytes{fstype!="tmpfs",mountpoint="/"})) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          team: Cloud DevSecOps
+        annotations:
+          summary: "Disk Almost Full — {{ $labels.nodename }}"
+          description: "Disk usage on / is {{ $value | printf \"%.1f\" }}% (threshold: 90%) on node {{ $labels.nodename }} ({{ $labels.instance }}). Immediate cleanup required — services may fail."
+{% endraw %}

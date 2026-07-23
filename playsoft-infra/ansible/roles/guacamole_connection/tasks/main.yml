@@ -1,5 +1,5 @@
 ---
-- name: Load Terraform output (terraform-k8s)
+- name: Load Terraform output (terraform-hzn)
   set_fact:
     tf: "{{ lookup('file', tf_output_path_root) | from_json }}"
 

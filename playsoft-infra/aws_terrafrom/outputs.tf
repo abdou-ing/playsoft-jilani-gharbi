@@ -47,6 +47,16 @@ output "monitoring_private_ip" {
   value = module.monitoring.private_ip
 }
 
+output "worker_security_group_id" {
+  description = "Consumed by ansible-amazon/roles/autoscaler's staged Terraform for extra workers"
+  value       = module.k8s_worker.security_group_id
+}
+
+output "target_group_arn" {
+  description = "Consumed by ansible-amazon/roles/autoscaler's staged Terraform for extra workers"
+  value       = module.load_balancer.target_group_arn
+}
+
 output "bastion_public_ip" {
   description = "SSH here"
   value       = module.bastion.public_ip

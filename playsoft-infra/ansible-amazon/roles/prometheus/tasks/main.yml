@@ -1,0 +1,58 @@
+---
+# Runs on the dedicated monitoring server. roles/autoscaler (bastion) still
+# owns Alertmanager + webhook.py + the worker-scaling Terraform/Ansible --
+# those stay next to the SSH key and AWS credentials they need. webhook.py
+# pushes targets.json here after every scale event / 60s sync.
+
+- name: Install prometheus
+  ansible.builtin.apt:
+    name: prometheus
+    state: present
+    update_cache: true
+
+- name: Create Prometheus config directory
+  ansible.builtin.file:
+    path: "{{ infra_dir }}/config"
+    state: directory
+    mode: '0755'
+
+- name: Template prometheus.yml (Alertmanager target = bastion's private IP)
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ infra_dir }}/config/prometheus.yml"
+    mode: '0644'
+  notify: restart prometheus
+
+- name: Template alerts.yml (nodename regex parameterized by project)
+  ansible.builtin.template:
+    src: alerts.yml.j2
+    dest: "{{ infra_dir }}/config/alerts.yml"
+    mode: '0644'
+  notify: restart prometheus
+
+- name: Create initial targets.json (skipped if file already exists)
+  ansible.builtin.copy:
+    content: "[]"
+    dest: "{{ infra_dir }}/config/targets.json"
+    force: false
+
+- name: Create prometheus systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/prometheus.service.d
+    state: directory
+    mode: '0755'
+
+- name: Deploy prometheus systemd override (custom config path)
+  ansible.builtin.copy:
+    src: prometheus-override.conf
+    dest: /etc/systemd/system/prometheus.service.d/override.conf
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart prometheus
+
+- name: Enable and start prometheus
+  ansible.builtin.systemd:
+    name: prometheus
+    state: started
+    enabled: true

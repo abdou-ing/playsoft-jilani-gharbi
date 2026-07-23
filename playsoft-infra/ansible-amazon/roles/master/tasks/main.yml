@@ -31,10 +31,6 @@
   register: k8s_initialized
 
 # ── First master: init ────────────────────────────────────────────────────────
-# aws_terrafrom provisions a single static master instance (no ASG, no HA
-# join flow), so groups['k8s_master_servers'] only ever has one host today
-# -- this is still written as "first master" / "additional masters" to
-# match the Hetzner project's role and stay correct if that ever changes.
 
 - name: Deploy kubeadm config
   ansible.builtin.template:
@@ -92,11 +88,6 @@
     - inventory_hostname == groups['k8s_master_servers'][0]
 
 - name: Install Calico
-  # kubectl apply is idempotent -- deliberately NOT gated on
-  # k8s_initialized (unlike init/copy-admin-conf above), so a rerun
-  # after a mid-play failure still applies it instead of skipping
-  # forever just because admin.conf already exists from an earlier
-  # partial run.
   ansible.builtin.command: kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
