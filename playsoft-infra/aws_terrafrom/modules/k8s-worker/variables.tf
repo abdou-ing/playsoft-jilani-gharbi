@@ -18,9 +18,9 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "private_subnet_ids" {
-  description = "Private subnet IDs the worker ASG spans"
-  type        = list(string)
+variable "private_subnet_id" {
+  description = "Private subnet the worker instance is pinned to"
+  type        = string
 }
 
 variable "alb_security_group_id" {
@@ -39,12 +39,17 @@ variable "bastion_security_group_id" {
 }
 
 variable "target_group_arn" {
-  description = "ALB target group ARN to register worker instances with"
+  description = "ALB target group ARN to register the worker instance with"
   type        = string
 }
 
+variable "app_nodeport" {
+  description = "NodePort the target group attachment listens on"
+  type        = number
+}
+
 variable "master_endpoint" {
-  description = "Control-plane NLB DNS name (host only), passed to worker userdata"
+  description = "Master's private IP, passed to worker userdata"
   type        = string
 }
 
@@ -52,16 +57,9 @@ variable "worker_instance_type" {
   type = string
 }
 
-variable "worker_min_size" {
-  type = number
-}
-
-variable "worker_max_size" {
-  type = number
-}
-
-variable "worker_desired_capacity" {
-  type = number
+variable "worker_private_ip" {
+  description = "Fixed private IP for the floor worker instance (must be inside private_subnet_id's CIDR)"
+  type        = string
 }
 
 variable "worker_root_volume_size" {

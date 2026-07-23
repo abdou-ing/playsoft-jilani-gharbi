@@ -47,6 +47,19 @@ module "k8s_master" {
   ami_id                    = var.ami_id
 }
 
+module "monitoring" {
+  source = "./modules/monitoring"
+
+  project                  = var.project
+  cluster_name             = var.cluster_name
+  vpc_id                   = module.network.vpc_id
+  public_subnet_id         = module.network.public_subnet_ids[0]
+  admin_cidr               = var.admin_cidr
+  ssh_key_name             = var.ssh_key_name
+  ami_id                   = var.ami_id
+  monitoring_instance_type = var.monitoring_instance_type
+}
+
 module "k8s_worker" {
   source = "./modules/k8s-worker"
 
@@ -54,16 +67,15 @@ module "k8s_worker" {
   cluster_name              = var.cluster_name
   region                    = var.region
   vpc_id                    = module.network.vpc_id
-  private_subnet_ids        = module.network.private_subnet_ids
+  private_subnet_id         = module.network.private_subnet_ids[0]
   alb_security_group_id     = module.load_balancer.security_group_id
   master_security_group_id  = module.k8s_master.security_group_id
   bastion_security_group_id = module.bastion.security_group_id
   target_group_arn          = module.load_balancer.target_group_arn
+  app_nodeport              = var.app_nodeport
   master_endpoint           = module.k8s_master.private_ip
   worker_instance_type      = var.worker_instance_type
-  worker_min_size           = var.worker_min_size
-  worker_max_size           = var.worker_max_size
-  worker_desired_capacity   = var.worker_desired_capacity
+  worker_private_ip         = var.worker_private_ip
   ssh_key_name              = var.ssh_key_name
   ami_id                    = var.ami_id
 }
@@ -105,4 +117,33 @@ resource "aws_security_group_rule" "master_pod_traffic_from_workers" {
   protocol                 = "-1"
   security_group_id        = module.k8s_master.security_group_id
   source_security_group_id = module.k8s_worker.security_group_id
+}
+
+############################################
+# Monitoring -> master/worker node_exporter scrape rules
+#
+# node_exporter (:9100) is already installed by both userdata scripts,
+# but nothing has ever opened the port -- Prometheus scrapes would
+# time out silently without these. Same reason as the rules above:
+# the monitoring module doesn't exist yet at the point k8s-master/
+# k8s-worker are created.
+############################################
+resource "aws_security_group_rule" "master_node_exporter_from_monitoring" {
+  description              = "node_exporter 9100 from monitoring"
+  type                     = "ingress"
+  from_port                = 9100
+  to_port                  = 9100
+  protocol                 = "tcp"
+  security_group_id        = module.k8s_master.security_group_id
+  source_security_group_id = module.monitoring.security_group_id
+}
+
+resource "aws_security_group_rule" "worker_node_exporter_from_monitoring" {
+  description              = "node_exporter 9100 from monitoring"
+  type                     = "ingress"
+  from_port                = 9100
+  to_port                  = 9100
+  protocol                 = "tcp"
+  security_group_id        = module.k8s_worker.security_group_id
+  source_security_group_id = module.monitoring.security_group_id
 }

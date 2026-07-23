@@ -1,0 +1,77 @@
+# PVC that PostgreSQL will use — backed by an EBS gp3 volume (see
+# 00b-ebs-storageclass.yaml), not Longhorn replication.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: guacamole
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ebs-gp3
+  resources:
+    requests:
+      storage: 5Gi
+
+# postgres-secret is no longer defined here — it's materialized by the
+# ExternalSecret in 07-vault-secrets.yaml, sourced from Vault (kv-dev/jilani/k8s).
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: guacamole
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: postgres
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: guacamole
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15.3
+        ports:
+          - containerPort: 5432
+        env:
+          - name: PGDATA
+            value: /var/lib/postgresql/data/pgdata
+          - name: POSTGRES_USER
+            valueFrom:
+              secretKeyRef:
+                name: postgres-secret
+                key: postgres-user
+          - name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: postgres-secret
+                key: postgres-password
+          - name: POSTGRES_DB
+            valueFrom:
+              secretKeyRef:
+                name: postgres-secret
+                key: postgres-db
+        volumeMounts:
+          - name: postgres-storage
+            mountPath: /var/lib/postgresql/data
+
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc

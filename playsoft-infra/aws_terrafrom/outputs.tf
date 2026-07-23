@@ -24,8 +24,8 @@ output "master_instance_id" {
   value = module.k8s_master.instance_id
 }
 
-output "worker_asg_name" {
-  value = module.k8s_worker.asg_name
+output "worker_instance_id" {
+  value = module.k8s_worker.instance_id
 }
 
 output "master_private_ip" {
@@ -33,9 +33,18 @@ output "master_private_ip" {
   value       = module.k8s_master.private_ip
 }
 
-output "worker_private_ips" {
-  description = "Private IPs of the current worker EC2 instances"
-  value       = module.k8s_worker.private_ips
+output "worker_private_ip" {
+  description = "Fixed private IP of the floor worker EC2 instance"
+  value       = module.k8s_worker.private_ip
+}
+
+output "monitoring_public_ip" {
+  description = "Grafana (:3000) / Prometheus (:9090) / SSH here, restricted to admin_cidr"
+  value       = module.monitoring.public_ip
+}
+
+output "monitoring_private_ip" {
+  value = module.monitoring.private_ip
 }
 
 output "bastion_public_ip" {

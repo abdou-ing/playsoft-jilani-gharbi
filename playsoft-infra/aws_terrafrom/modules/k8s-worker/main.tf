@@ -68,23 +68,29 @@ resource "aws_security_group_rule" "worker_egress" {
 }
 
 ############################################
-# WORKER launch template
+# WORKER instance (floor)
+#
+# A single, non-ASG instance pinned to a fixed private IP -- mirrors
+# modules/k8s-master exactly, same reasoning: this is the always-on
+# "floor" of the worker pool. Extra workers that the CPU-based
+# autoscaler adds/removes on top of this live in a separate,
+# bastion-staged Terraform state (own for_each over a workers map) so
+# scale-in can never touch this instance even by accident -- see
+# ansible-amazon/roles/autoscaler.
 ############################################
-resource "aws_launch_template" "worker" {
-  name_prefix   = "${var.project}-worker-"
-  image_id      = local.ami
+resource "aws_instance" "worker" {
+  ami           = local.ami
   instance_type = var.worker_instance_type
   key_name      = var.ssh_key_name != "" ? var.ssh_key_name : null
 
+  subnet_id              = var.private_subnet_id
+  private_ip             = var.worker_private_ip
   vpc_security_group_ids = [aws_security_group.worker.id]
 
-  block_device_mappings {
-    device_name = "/dev/sda1"
-    ebs {
-      volume_size           = var.worker_root_volume_size
-      volume_type           = "gp3"
-      delete_on_termination = true
-    }
+  root_block_device {
+    volume_size           = var.worker_root_volume_size
+    volume_type           = "gp3"
+    delete_on_termination = true
   }
 
   user_data = base64encode(templatefile("${path.module}/userdata/worker.sh", {
@@ -93,67 +99,20 @@ resource "aws_launch_template" "worker" {
     cluster_name    = var.cluster_name
   }))
 
-  tag_specifications {
-    resource_type = "instance"
-    tags = {
-      Name     = "${var.project}-worker"
-      k8s_role = "worker"
-    }
-  }
-
-  lifecycle { create_before_destroy = true }
-}
-
-############################################
-# WORKER ASG  (min=3, scales out; across all AZs)
-############################################
-resource "aws_autoscaling_group" "worker" {
-  name                = "${var.project}-worker-asg"
-  min_size            = var.worker_min_size
-  max_size            = var.worker_max_size
-  desired_capacity    = var.worker_desired_capacity
-  vpc_zone_identifier = var.private_subnet_ids
-
-  # Register workers with the ALB target group automatically
-  target_group_arns = [var.target_group_arn]
-
-  launch_template {
-    id      = aws_launch_template.worker.id
-    version = "$Latest"
-  }
-
-  health_check_type         = "EC2"
-  health_check_grace_period = 300
-
-  tag {
-    key                 = "Name"
-    value               = "${var.project}-worker"
-    propagate_at_launch = true
-  }
-  tag {
-    key                 = "k8s_role"
-    value               = "worker"
-    propagate_at_launch = true
-  }
-  tag {
-    key                 = "kubernetes_cluster"
-    value               = var.cluster_name
-    propagate_at_launch = true
-  }
-  tag {
-    key                 = "created_by"
-    value               = "jilani"
-    propagate_at_launch = true
+  tags = {
+    Name               = "${var.project}-worker-1"
+    k8s_role           = "worker"
+    kubernetes_cluster = var.cluster_name
+    created_by         = "jilani"
   }
 }
 
-# Resolves the worker ASG's live instances so we can output their IPs.
-data "aws_instances" "worker" {
-  filter {
-    name   = "tag:aws:autoscaling:groupName"
-    values = [aws_autoscaling_group.worker.name]
-  }
-  instance_state_names = ["pending", "running"]
-
-  depends_on = [aws_autoscaling_group.worker]
+# Registers the floor worker with the ALB target group. Extra
+# autoscaler-added workers get their own attachment inside the staged
+# Terraform config on the bastion -- not here, since that state is
+# what actually creates those instances.
+resource "aws_lb_target_group_attachment" "worker" {
+  target_group_arn = var.target_group_arn
+  target_id        = aws_instance.worker.id
+  port             = var.app_nodeport
 }

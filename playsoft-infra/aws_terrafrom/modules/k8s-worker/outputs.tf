@@ -2,11 +2,11 @@ output "security_group_id" {
   value = aws_security_group.worker.id
 }
 
-output "asg_name" {
-  value = aws_autoscaling_group.worker.name
+output "instance_id" {
+  value = aws_instance.worker.id
 }
 
-output "private_ips" {
-  description = "Private IPs of the current worker ASG instances"
-  value       = data.aws_instances.worker.private_ips
+output "private_ip" {
+  description = "Fixed private IP of the floor worker"
+  value       = aws_instance.worker.private_ip
 }

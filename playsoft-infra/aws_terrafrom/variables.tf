@@ -66,24 +66,19 @@ variable "bastion_instance_type" {
   default = "t3.small"
 }
 
+variable "monitoring_instance_type" {
+  type    = string
+  default = "t3.small"
+}
+
 variable "admin_cidr" {
   description = "CIDR allowed to SSH the bastion (use your IP as x.x.x.x/32 -- never 0.0.0.0/0). No default: you must set this explicitly."
   type        = string
 }
 
-variable "worker_min_size" {
-  type    = number
-  default = 3
-}
-
-variable "worker_max_size" {
-  type    = number
-  default = 6
-}
-
-variable "worker_desired_capacity" {
-  type    = number
-  default = 3
+variable "worker_private_ip" {
+  description = "Fixed private IP for the floor worker instance (must be inside private_subnet_cidrs[0]). Extra workers the CPU-based autoscaler adds/removes live in a separate, bastion-staged Terraform state -- see ansible-amazon/roles/autoscaler -- so this is only ever the always-on floor, never a scale target."
+  type        = string
 }
 
 variable "ssh_key_name" {

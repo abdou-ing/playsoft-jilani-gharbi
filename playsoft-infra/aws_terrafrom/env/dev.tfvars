@@ -12,14 +12,15 @@ private_subnet_cidrs = ["10.20.10.0/24"]
 ami_id = ""
 
 master_private_ip = "10.20.10.10"
+# Floor worker only -- the autoscaler adds/removes extra workers starting at
+# .20 (see ansible-amazon/roles/autoscaler), matching the Hetzner project's
+# own WORKER_BASE_IP convention so the two ranges never collide.
+worker_private_ip = "10.20.10.20"
 
-master_instance_type  = "t3.medium"
-worker_instance_type  = "t3.large"
-bastion_instance_type = "t3.small"
-
-worker_min_size         = 1
-worker_max_size         = 4
-worker_desired_capacity = 1
+master_instance_type     = "t3.medium"
+worker_instance_type     = "t3.large"
+bastion_instance_type    = "t3.small"
+monitoring_instance_type = "t3.small"
 
 admin_cidr = "102.152.223.129/32"
 
