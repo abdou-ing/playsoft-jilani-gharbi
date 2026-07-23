@@ -9,9 +9,9 @@ azs                  = ["us-east-1a", "us-east-1b"]
 public_subnet_cidrs  = ["10.30.0.0/24", "10.30.1.0/24"]
 private_subnet_cidrs = ["10.30.10.0/24", "10.30.11.0/24"]
 
-admin_cidr = "102.152.223.129/32"
+admin_cidr = "0.0.0.0/0"
 
-ssh_key_name = "jilani"
+ssh_key_name = "key-name"
 
 cluster_role_name = ""
 node_role_name    = ""
