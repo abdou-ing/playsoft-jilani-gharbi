@@ -1,0 +1,46 @@
+# Copy to terraform.tfvars and adjust.
+
+region       = "<aws-region>"        # e.g. us-east-1
+project      = "<project-name>"      # e.g. my-k8s-eks
+cluster_name = "<cluster-name>"      # e.g. my-cluster
+
+kubernetes_version = "1.35"
+
+vpc_cidr             = "<vpc-cidr>"                                   # e.g. 10.0.0.0/16
+azs                  = ["<az-1>", "<az-2>"]                           # e.g. us-east-1a, us-east-1b
+public_subnet_cidrs  = ["<public-subnet-cidr-1>", "<public-subnet-cidr-2>"]   # e.g. 10.0.0.0/24, 10.0.1.0/24
+private_subnet_cidrs = ["<private-subnet-cidr-1>", "<private-subnet-cidr-2>"] # e.g. 10.0.10.0/24, 10.0.11.0/24
+
+# Set this to your own IP
+admin_cidr = "<YOUR_IP>/32"
+
+# Leave empty to disable SSH access to nodes (SSM Session Manager still works
+# either way via the node role's AmazonSSMManagedInstanceCore policy).
+ssh_key_name = "<your-ec2-key-pair-name>"
+
+
+cluster_role_name      = ""
+node_role_name         = ""
+ebs_csi_role_arn       = ""
+lb_controller_role_arn = ""
+
+node_instance_types = ["t3.large"]
+node_desired_size   = 2
+node_min_size       = 2
+node_max_size       = 4
+node_disk_size      = 40
+
+# Proxmox (candidate target VMs -- see main.tf's module "ssh_server"/
+# "vnc_server" for the vm_id collision warning vs. terraform/hetzner's state).
+# proxmox_api_token_id/secret belong in env/dev.secrets.tfvars (gitignored),
+# not here -- this file documents the shape only, with a placeholder.
+proxmox_api_url              = "<proxmox-api-url>"        # e.g. https://proxmox.example.com:8006/api2/json
+proxmox_ssh_username         = "<proxmox-ssh-user>"
+proxmox_ssh_private_key_path = "~/.ssh/<key>"
+node_name                    = "<proxmox-node-name>"
+template_id                  = 0
+vnc_server_count             = 0
+ssh_server_count             = 0
+
+# proxmox_api_token_id     = "<user>@pve!<token-name>"       # env/dev.secrets.tfvars
+# proxmox_api_token_secret = "<token-secret>"                # env/dev.secrets.tfvars

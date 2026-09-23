@@ -1,0 +1,19 @@
+# Terraform working directory and downloaded providers/modules
+.terraform/
+
+# Terraform state and backups
+*.tfstate
+*.tfstate.*
+
+# Terraform plans and crash logs
+*.tfplan
+crash.log
+crash.*.log
+
+# Local CLI configuration and override files
+.terraformrc
+terraform.rc
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
