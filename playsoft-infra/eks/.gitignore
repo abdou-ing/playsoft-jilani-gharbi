@@ -1,0 +1,19 @@
+# Terraform state, plugin dir, tf_output.json and the Proxmox secrets
+# tfvars now live under ../terraform/aws-eks/ (see its own .gitignore
+# there), not here.
+
+# Local environment overrides
+.env
+*.env
+
+# Editor & IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+debug.log
